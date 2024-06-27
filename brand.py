@@ -1,15 +1,16 @@
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, storage
+import pandas as pd
 import cairosvg
 from PIL import Image
 from bs4 import BeautifulSoup
+import firebase_admin
+from firebase_admin import credentials, storage
+import json
 from datetime import datetime
-import pandas as pd
 
-# Initialize Firebase
+# Initialize Firebase Admin SDK
 if not firebase_admin._apps:
-    firebase_credentials = dict(st.secrets["FIREBASE_CREDENTIALS"])
+    firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
         'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
@@ -81,7 +82,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
+def change_bar_colors(svg_content, measurement_unit, source_data):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -120,18 +121,20 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
         rect_id = rect['id']
         if rect_id in id_provider_map:
             provider_name = id_provider_map[rect_id]
-            print(f"Processing bar {rect_id} for provider {provider_name}")
             if provider_name in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name})'
                 # Adjust tooltip values based on scaling factor
+                rect_height = float(rect['height'])
                 provider_title = provider_name.title()
                 if provider_title in source_data.index:
-                    actual_value = source_data.loc[provider_title, value_column]
+                    actual_value = source_data.loc[provider_title, source_data.columns[0]]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-                    print(f"Added tooltip for {provider_name} with value {actual_value}")
-
+                    print(f"Added tooltip for {provider_name} with value {actual_value:.2f}")
+                else:
+                    print(f"No data found for provider {provider_title}")
+    
     return str(soup)
 
 def convert_svg_to_jpg(svg_content, output_path):
@@ -149,68 +152,55 @@ def convert_svg_to_jpg(svg_content, output_path):
 
     return output_jpg_path
 
-def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
-    """Uploads a file to the bucket."""
-    blob = bucket.blob(destination_blob_name)
-    blob.upload_from_filename(file_path)
-    return blob.public_url
-
 # Streamlit UI
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
 
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
-uploaded_data = st.file_uploader("Choose a CSV file with the source data", type="csv")
-measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):")
+uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv")
+measurement_unit = st.text_input("Enter the unit of measurement:")
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
+
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data)
     
-    value_column = st.selectbox("Select the column for values", source_data.columns)
+    # Prompt user for file name and date
+    file_name = st.text_input("Enter the file name:")
+    current_date = datetime.now().strftime("%Y-%m-%d")
 
-    if value_column:
-        modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column)
+    if file_name:
+        full_name = f"{file_name}_{current_date}.svg"
+        st.download_button(
+            label="Download modified SVG",
+            data=modified_svg_content,
+            file_name=full_name,
+            mime="image/svg+xml"
+        )
+        
+        # Convert modified SVG to JPG
+        output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name.replace('.svg', '.jpg'))
+        st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
+        
+        # Upload to Firebase Storage
+        bucket = storage.bucket()
+        svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
+        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
 
-        # Save the modified SVG content to a file
-        file_name = st.text_input("Enter the file name:")
-        current_date = datetime.now().strftime("%Y-%m-%d")
+        st.write(f"SVG uploaded to: {svg_url}")
+        st.write(f"JPG uploaded to: {jpg_url}")
 
-        if file_name:
-            full_name = f"{file_name}_{current_date}.svg"
-            with open(full_name, 'w') as file:
-                file.write(modified_svg_content)
-            print(f"Saved modified SVG as {full_name}")
-
-            output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
-            print(f"Converted SVG to JPG: {output_jpg_path}")
-
-            st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
-
-            # Download modified SVG
+        with open(output_jpg_path, "rb") as img_file:
             st.download_button(
-                label="Download modified SVG",
-                data=modified_svg_content,
-                file_name=full_name,
-                mime="image/svg+xml"
+                label="Download modified JPG",
+                data=img_file,
+                file_name=full_name.replace('.svg', '.jpg'),
+                mime="image/jpeg"
             )
 
-            # Download modified JPG
-            with open(output_jpg_path, "rb") as img_file:
-                st.download_button(
-                    label="Download modified JPG",
-                    data=img_file,
-                    file_name=full_name.replace('.svg', '.jpg'),
-                    mime="image/jpeg"
-                )
-
-            # Upload to Firebase Storage
-            try:
-                bucket = storage.bucket()
-                svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-                jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_name.replace('.svg', '.jpg'))
-                st.write(f"SVG uploaded to: {svg_url}")
-                st.write(f"JPG uploaded to: {jpg_url}")
-            except Exception as e:
-                st.write(f"Failed to upload to Firebase Storage: {e}")
-                print(f"Failed to upload to Firebase Storage: {e}")
+def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
+    """Uploads a file to the bucket."""
+    blob = bucket.blob(destination_blob_name)
+    blob.upload_from_filename(file_path)
+    return blob.public_url
