@@ -129,13 +129,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     rect:hover {
         stroke: #000000;
         stroke-width: 2;
-        filter: brightness(1.2);
-    }
-    </style>
-    """
-    soup.svg.append(BeautifulSoup(style, 'html.parser'))
-
-    return str(soup)
+        filter: brigh
 def convert_svg_to_jpg(svg_content, output_path):
     temp_svg_path = 'temp_modified_viz.svg'
     with open(temp_svg_path, 'w') as file:
