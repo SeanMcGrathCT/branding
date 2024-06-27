@@ -179,9 +179,9 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
 
     # Create a dictionary to map each bar ID to a CSV column
     value_column_mapping = {}
-    for bar_id in bar_ids:
+    for i, bar_id in enumerate(bar_ids):
         provider_name = bar_id.split(' - ')[0].lower()
-        value_column_mapping[bar_id] = (provider_name, st.selectbox(f"Select the column for {bar_id}:", list(source_data.columns), key=bar_id))
+        value_column_mapping[bar_id] = (provider_name, st.selectbox(f"Select the column for {bar_id}:", list(source_data.columns), key=f"{bar_id}_{i}"))
 
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
