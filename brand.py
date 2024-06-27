@@ -153,6 +153,34 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
     }
     </style>
     """
+    soup.svg.append(BeautifulSoup(style, 'html.parser'))
+
+    return str(soup)
+
+    for rect in rects:
+        rect_id = rect['id']
+        if rect_id in id_provider_map:
+            provider_name = id_provider_map[rect_id].title()
+            if provider_name.lower() in vpn_colors:
+                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
+                # Adjust tooltip values based on scaling factor
+                rect_height = float(rect['height'])
+                normalized_provider_name = provider_name.lower()
+                if normalized_provider_name in source_data.index:
+                    actual_value = source_data.loc[normalized_provider_name, value_column]
+                    rect_title = soup.new_tag('title')
+                    rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
+                    rect.append(rect_title)
+    
+    # Add CSS for highlighting bars on hover
+    style = """
+    <style>
+    rect:hover {
+        stroke: #000000;
+        stroke-width: 2;
+    }
+    </style>
+    """
     soup.style.append(style)
 
     return str(soup)
