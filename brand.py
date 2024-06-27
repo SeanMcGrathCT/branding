@@ -1,7 +1,6 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, storage
-import json
 import cairosvg
 from PIL import Image
 from bs4 import BeautifulSoup
@@ -9,7 +8,7 @@ from datetime import datetime
 
 # Initialize Firebase
 if not firebase_admin._apps:
-    firebase_credentials = json.loads(st.secrets["FIREBASE_CREDENTIALS"])
+    firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
         'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
