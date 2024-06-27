@@ -2,6 +2,17 @@ import streamlit as st
 import cairosvg
 from PIL import Image
 from bs4 import BeautifulSoup
+import datetime
+import firebase_admin
+from firebase_admin import credentials, storage
+import tempfile
+
+# Initialize Firebase Admin SDK
+if not firebase_admin._apps:
+    cred = credentials.Certificate(st.secrets["FIREBASE_CREDENTIALS"])
+    firebase_admin.initialize_app(cred, {
+        'storageBucket': f'{st.secrets["FIREBASE_CREDENTIALS"]["project_id"]}.appspot.com'
+    })
 
 # Define VPN colors
 vpn_colors = {
@@ -123,27 +134,52 @@ def convert_svg_to_jpg(svg_content, output_path):
 
     return output_jpg_path
 
+def upload_to_firebase_storage(file_path, destination_blob_name):
+    bucket = storage.bucket()
+    blob = bucket.blob(destination_blob_name)
+    blob.upload_from_filename(file_path)
+    blob.make_public()
+    return blob.public_url
+
 # Streamlit UI
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
 
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
+svg_name = st.text_input("Enter SVG name", "viz")
+svg_date = st.date_input("Enter date", datetime.date.today())
 
 if uploaded_file is not None:
     svg_content = uploaded_file.read().decode("utf-8")
     
     modified_svg_content = change_bar_colors(svg_content)
     
+    # Define file names
+    file_suffix = f"{svg_name}_{svg_date}.svg"
+    output_svg_path = f"modified_{file_suffix}"
+    output_jpg_path = output_svg_path.replace('.svg', '.jpg')
+    
+    # Save modified SVG locally
+    with open(output_svg_path, 'w') as file:
+        file.write(modified_svg_content)
+    
     # Convert modified SVG to JPG
-    output_jpg_path = convert_svg_to_jpg(modified_svg_content, 'modified_viz.jpg')
+    output_jpg_path = convert_svg_to_jpg(modified_svg_content, output_svg_path)
     
     st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
+    
+    # Upload files to Firebase Storage
+    svg_url = upload_to_firebase_storage(output_svg_path, output_svg_path)
+    jpg_url = upload_to_firebase_storage(output_jpg_path, output_jpg_path)
+    
+    st.write(f"SVG file uploaded to: [Firebase Storage]({svg_url})")
+    st.write(f"JPG file uploaded to: [Firebase Storage]({jpg_url})")
 
     # Download modified SVG
     st.download_button(
         label="Download modified SVG",
         data=modified_svg_content,
-        file_name="modified_viz.svg",
+        file_name=output_svg_path,
         mime="image/svg+xml"
     )
     
@@ -152,6 +188,6 @@ if uploaded_file is not None:
         st.download_button(
             label="Download modified JPG",
             data=img_file,
-            file_name="modified_viz.jpg",
+            file_name=output_jpg_path,
             mime="image/jpeg"
         )
