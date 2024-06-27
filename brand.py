@@ -124,7 +124,7 @@ def convert_svg_to_jpg(svg_content, output_path):
     return output_jpg_path
 
 # Streamlit UI
-st.title("VPN Speed Test Visualization")
+st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
 
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
