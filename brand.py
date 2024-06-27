@@ -82,7 +82,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description):
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -139,7 +139,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
                 rect_height = float(rect['height'])
                 normalized_provider_name = provider_name.lower()
                 if normalized_provider_name in source_data.index:
-                    actual_value = source_data.loc[normalized_provider_name, value_column]
+                    actual_value = source_data.loc[normalized_provider_name, value_column_mapping[rect_id]]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
@@ -155,34 +155,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
     </style>
     """
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
-
-    return str(soup)
-
-    for rect in rects:
-        rect_id = rect['id']
-        if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id].title()
-            if provider_name.lower() in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-                # Adjust tooltip values based on scaling factor
-                rect_height = float(rect['height'])
-                normalized_provider_name = provider_name.lower()
-                if normalized_provider_name in source_data.index:
-                    actual_value = source_data.loc[normalized_provider_name, value_column]
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
-                    rect.append(rect_title)
-    
-    # Add CSS for highlighting bars on hover
-    style = """
-    <style>
-    rect:hover {
-        stroke: #000000;
-        stroke-width: 2;
-    }
-    </style>
-    """
-    soup.style.append(style)
 
     return str(soup)
 
@@ -222,11 +194,16 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
-    # Display available columns and let the user select one
-    available_columns = list(source_data.columns)
-    value_column = st.selectbox("Select the column to use for values:", available_columns)
+    # Extract all labels from the SVG for dynamic mapping
+    soup = BeautifulSoup(svg_content, 'xml')
+    labels = extract_providers_from_labels(soup)
 
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description)
+    # Create a dictionary to map each SVG label to a CSV column
+    value_column_mapping = {}
+    for label in labels:
+        value_column_mapping[label] = st.selectbox(f"Select the column for {label}:", list(source_data.columns))
+
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
