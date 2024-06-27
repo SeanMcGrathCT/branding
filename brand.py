@@ -122,11 +122,18 @@ def change_bar_colors(svg_content, measurement_unit, source_data):
             provider_name = id_provider_map[rect_id]
             if provider_name in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name})'
-                # Adjust tooltip values based on source data
-                actual_value = source_data.loc[provider_name.title()]['Value']
-                rect_title = soup.new_tag('title')
-                rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
-                rect.append(rect_title)
+                # Adjust tooltip values based on scaling factor
+                rect_height = float(rect['height'])
+                provider_title = provider_name.title()
+                if provider_title in source_data.index:
+                    actual_value = source_data.loc[provider_title, 'Value']
+                    rect_title = soup.new_tag('title')
+                    rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
+                    rect.append(rect_title)
+                else:
+                    rect_title = soup.new_tag('title')
+                    rect_title.string = f"Value not available"
+                    rect.append(rect_title)
                 # Highlight bar on hover
                 rect['onmouseover'] = "this.style.fillOpacity=0.8"
                 rect['onmouseout'] = "this.style.fillOpacity=1.0"
@@ -200,7 +207,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
         # Upload to Firebase Storage
         bucket = storage.bucket()
         svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
-
+        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_name.replace('.svg', '.jpg'))
+        
         st.write(f"SVG uploaded to: {svg_url}")
         st.write(f"JPG uploaded to: {jpg_url}")
