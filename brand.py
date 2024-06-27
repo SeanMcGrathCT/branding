@@ -125,14 +125,15 @@ def change_bar_colors(svg_content, measurement_unit, source_data):
                 rect['fill'] = f'url(#gradient-{provider_name.lower()})'
                 # Adjust tooltip values based on scaling factor
                 rect_height = float(rect['height'])
-                if provider_name in source_data.index:
-                    actual_value = source_data.loc[provider_name, source_data.columns[0]]
+                normalized_provider_name = provider_name.lower()
+                if normalized_provider_name in source_data.index:
+                    actual_value = source_data.loc[normalized_provider_name, source_data.columns[0]]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-                    print(f"Added tooltip for {provider_name} with value {actual_value:.2f}")
+                    st.write(f"Added tooltip for {provider_name} with value {actual_value:.2f}")
                 else:
-                    print(f"No data found for provider {provider_name}")
+                    st.write(f"No data found for provider {provider_name}")
     
     return str(soup)
 
@@ -168,6 +169,7 @@ measurement_unit = st.text_input("Enter the unit of measurement:")
 if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
+    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data)
     
