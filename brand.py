@@ -81,7 +81,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content):
+def change_bar_colors(svg_content, measurement_unit):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -121,7 +121,7 @@ def change_bar_colors(svg_content):
             # Add tooltip with Y-axis value
             y_value = float(rect['y'])
             title = soup.new_tag('title')
-            title.string = f'Value: {y_value}'
+            title.string = f'Value: {y_value:.2f} {measurement_unit}'
             rect.append(title)
 
     # Add hover effect using CSS
@@ -171,7 +171,9 @@ if uploaded_file is not None:
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
     date = st.date_input("Enter the date:", value=datetime.today())
-    if file_name and date:
+    measurement_unit = st.text_input("Enter the measurement unit (e.g., Mbps):")
+
+    if file_name and date and measurement_unit:
         formatted_date = date.strftime("%Y-%m-%d")
         full_svg_name = f"{file_name}_{formatted_date}.svg"
         full_jpg_name = full_svg_name.replace('.svg', '.jpg')
@@ -208,3 +210,53 @@ if uploaded_file is not None:
         
         st.write(f"SVG uploaded to: [SVG Link]({svg_url})")
         st.write(f"JPG uploaded to: [JPG Link]({jpg_url})")
+
+# Main logic
+if uploaded_file:
+    svg_content = uploaded_file.read().decode("utf-8")
+    measurement_unit = st.text_input("Enter the measurement unit (e.g., Mbps):", value="Mbps")
+    
+    if st.button("Modify SVG"):
+        modified_svg_content = change_bar_colors(svg_content, measurement_unit)
+        
+        # Prompt user for file name and date
+        file_name = st.text_input("Enter the file name:")
+        date = st.date_input("Enter the date:", value=datetime.today())
+
+        if file_name and date:
+            formatted_date = date.strftime("%Y-%m-%d")
+            full_svg_name = f"{file_name}_{formatted_date}.svg"
+            full_jpg_name = full_svg_name.replace('.svg', '.jpg')
+            
+            with open(full_svg_name, 'w') as f:
+                f.write(modified_svg_content)
+            
+            # Convert modified SVG to JPG
+            output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_svg_name)
+            
+            st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
+            
+            # Download modified SVG
+            st.download_button(
+                label="Download modified SVG",
+                data=modified_svg_content,
+                file_name=full_svg_name,
+                mime="image/svg+xml"
+            )
+            
+            # Download modified JPG
+            with open(output_jpg_path, "rb") as img_file:
+                st.download_button(
+                    label="Download modified JPG",
+                    data=img_file,
+                    file_name=full_jpg_name,
+                    mime="image/jpeg"
+                )
+            
+            # Upload to Firebase Storage
+            bucket = storage.bucket()
+            svg_url = upload_to_firebase_storage(full_svg_name, bucket, full_svg_name)
+            jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_jpg_name)
+            
+            st.write(f"SVG uploaded to: [SVG Link]({svg_url})")
+            st.write(f"JPG uploaded to: [JPG Link]({jpg_url})")
