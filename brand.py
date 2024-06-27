@@ -172,12 +172,15 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     if value_column:
         modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column)
 
-        # Prompt user for file name and date
+        # Save the modified SVG content to a file
         file_name = st.text_input("Enter the file name:")
         current_date = datetime.now().strftime("%Y-%m-%d")
 
         if file_name:
             full_name = f"{file_name}_{current_date}.svg"
+            with open(full_name, 'w') as file:
+                file.write(modified_svg_content)
+
             output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
 
             st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
@@ -202,7 +205,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
             # Upload to Firebase Storage
             bucket = storage.bucket()
             svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-            jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
+            jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_name.replace('.svg', '.jpg'))
 
             st.write(f"SVG uploaded to: {svg_url}")
             st.write(f"JPG uploaded to: {jpg_url}")
