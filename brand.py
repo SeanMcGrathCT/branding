@@ -97,10 +97,12 @@ def extract_unique_labels(svg_content):
 
 def generate_column_mapping(unique_labels, source_data):
     value_column_mapping = {}
-    for provider in vpn_colors.keys():
-        if provider in unique_labels:
-            column = st.selectbox(f"Select the column for {provider}:", list(source_data.columns), key=provider)
-            value_column_mapping[provider] = column
+    for label in unique_labels:
+        if label in source_data.columns:
+            value_column_mapping[label] = label
+        else:
+            column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
+            value_column_mapping[label] = column
     return value_column_mapping
 
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
