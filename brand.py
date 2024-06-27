@@ -68,6 +68,7 @@ def extract_bar_ids(soup):
         if 'id' in bar.attrs:
             bar_ids.append(f"{bar['id']}_{i}")  # Add unique suffix to each bar ID
     return bar_ids
+
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
@@ -129,7 +130,14 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     rect:hover {
         stroke: #000000;
         stroke-width: 2;
-        filter: brigh
+        filter: brightness(1.2);
+    }
+    </style>
+    """
+    soup.svg.append(BeautifulSoup(style, 'html.parser'))
+
+    return str(soup)
+
 def convert_svg_to_jpg(svg_content, output_path):
     temp_svg_path = 'temp_modified_viz.svg'
     with open(temp_svg_path, 'w') as file:
@@ -150,6 +158,7 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(file_path)
     return blob.public_url
+
 # Streamlit UI
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
@@ -198,6 +207,18 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         # Convert modified SVG to JPG
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
+        
+        # Upload to Firebase Storage
+        bucket = storage.bucket()
+        svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
+        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
+
+        st.write(f"SVG uploaded to: {svg_url}")
+        st.write(f"JPG uploaded to: {jpg_url}")
+
+        with open(output_jpg_path, "rb") as img_file:
+            st.download_button(
+                label="Download
         
         # Upload to Firebase Storage
         bucket = storage.bucket()
