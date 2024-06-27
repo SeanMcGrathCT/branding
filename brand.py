@@ -144,17 +144,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
     
-    # Add CSS for highlighting bars on hover
-    style = """
-    <style>
-    rect:hover {
-        stroke: #000000;
-        stroke-width: 2;
-    }
-    </style>
-    """
-    soup.append(BeautifulSoup(style, 'html.parser'))
-
     return str(soup)
 
 def convert_svg_to_jpg(svg_content, output_path):
