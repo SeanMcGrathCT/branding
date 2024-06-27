@@ -61,26 +61,6 @@ def extract_providers_from_labels(soup):
             providers.append(text)
     return providers
 
-def extract_unique_labels(svg_content):
-    soup = BeautifulSoup(svg_content, 'xml')
-    bars = soup.find_all('rect')
-    
-    unique_labels = set()
-    for bar in bars:
-        if 'id' in bar.attrs:  # Check if 'id' attribute exists
-            original_id = bar['id']
-            clean_id = original_id.replace("undefined - ", "").strip()
-            unique_labels.add(clean_id)
-    
-    return list(unique_labels)
-
-def generate_column_mapping(unique_labels, source_data):
-    value_column_mapping = {}
-    for label in unique_labels:
-        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
-        value_column_mapping[label] = column
-    return value_column_mapping
-
 def map_bars_to_providers(soup, providers):
     id_provider_map = {}
     ticks = soup.find_all('g', {'class': 'tick'})
@@ -131,6 +111,9 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     add_gradients_to_svg(soup, vpn_colors)
 
     id_provider_map = map_bars_to_providers(soup, providers)
+    
+    # Debugging: Print the id_provider_map
+    st.write("ID Provider Map:", id_provider_map)
 
     # Embed source data as metadata
     metadata = soup.new_tag('metadata')
@@ -151,6 +134,11 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
 
     for rect in rects:
         rect_id = rect['id']
+        
+        # Debugging: Print rect_id and check if it's in id_provider_map
+        st.write("Processing rect ID:", rect_id)
+        st.write("ID in id_provider_map:", rect_id in id_provider_map)
+        
         if rect_id in id_provider_map:
             provider_name = id_provider_map[rect_id].title()
             if provider_name.lower() in vpn_colors:
