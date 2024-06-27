@@ -111,11 +111,10 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
 
     id_provider_map = map_bars_to_providers(soup, providers)
 
-    # Determine the scaling factor
-    y_ticks = soup.find_all('g', {'class': 'tick'})
-    y_tick_values = [tick.find('text').get_text() for tick in y_ticks if tick.find('text')]
-    max_tick_value = max([float(value) for value in y_tick_values])
-    scaling_factor = max_tick_value / 10  # Assuming the original scale is 1-10
+    # Embed source data as metadata
+    metadata = soup.new_tag('metadata')
+    metadata.string = source_data.to_json()
+    soup.svg.append(metadata)
 
     for rect in rects:
         rect_id = rect['id']
