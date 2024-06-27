@@ -132,9 +132,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
 
     id_provider_map = map_bars_to_providers(soup, providers)
     
-    # Debugging: Print the id_provider_map
-    st.write("ID Provider Map:", id_provider_map)
-
     # Embed source data as metadata
     metadata = soup.new_tag('metadata')
     metadata.string = source_data.to_json()
@@ -155,10 +152,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     for rect in rects:
         rect_id = rect['id']
         
-        # Debugging: Print rect_id and check if it's in id_provider_map
-        st.write("Processing rect ID:", rect_id)
-        st.write("ID in id_provider_map:", rect_id in id_provider_map)
-        
         if rect_id in id_provider_map:
             provider_name = id_provider_map[rect_id].title()
             if provider_name.lower() in vpn_colors:
@@ -167,10 +160,9 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
                 rect_height = float(rect['height'])
                 normalized_provider_name = provider_name.lower()
                 if normalized_provider_name in source_data.index:
-                    clean_id = rect_id.replace("bar-", "")  # Use the cleaned ID to map to the correct column
-                    if clean_id in value_column_mapping:
-                        csv_column = value_column_mapping[clean_id]
-                        actual_value = source_data.loc[normalized_provider_name, csv_column]
+                    column_name = value_column_mapping.get(provider_name.lower())
+                    if column_name:
+                        actual_value = source_data.loc[normalized_provider_name, column_name]
                         rect_title = soup.new_tag('title')
                         rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                         rect.append(rect_title)
@@ -255,7 +247,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         # Convert modified SVG to JPG
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
-
+        
         # Upload to Firebase Storage
         bucket = storage.bucket()
         svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
