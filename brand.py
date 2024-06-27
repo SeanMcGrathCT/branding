@@ -167,9 +167,10 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
                 rect_height = float(rect['height'])
                 normalized_provider_name = provider_name.lower()
                 if normalized_provider_name in source_data.index:
-                    clean_id = rect_id.replace("bar-", "")
+                    clean_id = rect_id.replace("bar-", "")  # Use the cleaned ID to map to the correct column
                     if clean_id in value_column_mapping:
-                        actual_value = source_data.loc[normalized_provider_name, value_column_mapping[clean_id]]
+                        csv_column = value_column_mapping[clean_id]
+                        actual_value = source_data.loc[normalized_provider_name, csv_column]
                         rect_title = soup.new_tag('title')
                         rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                         rect.append(rect_title)
