@@ -6,6 +6,7 @@ import cairosvg
 from PIL import Image
 from bs4 import BeautifulSoup
 import tempfile
+from datetime import datetime
 
 # Initialize Firebase
 if not firebase_admin._apps:
@@ -154,13 +155,17 @@ if uploaded_file is not None:
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
-    date = st.date_input("Enter the date:")
+    date = st.date_input("Enter the date:", value=datetime.today())
     if file_name and date:
-        full_name = f"{file_name}_{date}.svg"
-        output_jpg_path = full_name.replace('.svg', '.jpg')
+        formatted_date = date.strftime("%Y-%m-%d")
+        full_svg_name = f"{file_name}_{formatted_date}.svg"
+        full_jpg_name = full_svg_name.replace('.svg', '.jpg')
+        
+        with open(full_svg_name, 'w') as f:
+            f.write(modified_svg_content)
         
         # Convert modified SVG to JPG
-        output_jpg_path = convert_svg_to_jpg(modified_svg_content, output_jpg_path)
+        output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_svg_name)
         
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
         
@@ -168,7 +173,7 @@ if uploaded_file is not None:
         st.download_button(
             label="Download modified SVG",
             data=modified_svg_content,
-            file_name=full_name,
+            file_name=full_svg_name,
             mime="image/svg+xml"
         )
         
@@ -177,14 +182,14 @@ if uploaded_file is not None:
             st.download_button(
                 label="Download modified JPG",
                 data=img_file,
-                file_name=output_jpg_path,
+                file_name=full_jpg_name,
                 mime="image/jpeg"
             )
         
         # Upload to Firebase Storage
         bucket = storage.bucket()
-        svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
+        svg_url = upload_to_firebase_storage(full_svg_name, bucket, full_svg_name)
+        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_jpg_name)
         
-        st.write(f"SVG uploaded to: {svg_url}")
-        st.write(f"JPG uploaded to: {jpg_url}")
+        st.write(f"SVG uploaded to: [SVG Link]({svg_url})")
+        st.write(f"JPG uploaded to: [JPG Link]({jpg_url})")
