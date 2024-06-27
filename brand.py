@@ -8,7 +8,7 @@ from datetime import datetime
 
 # Initialize Firebase
 if not firebase_admin._apps:
-    firebase_credentials = json.loads(st.secrets["FIREBASE_CREDENTIALS"].to_json())
+    firebase_credentials = dict(st.secrets["FIREBASE_CREDENTIALS"])
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
         'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
