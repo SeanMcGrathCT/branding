@@ -10,7 +10,7 @@ from datetime import datetime
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
-    firebase_credentials = json.loads(st.secrets["FIREBASE_CREDENTIALS"])
+    firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
         'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
@@ -82,7 +82,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -92,11 +92,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
 
     # Remove x and y labels
     for text in soup.find_all('text'):
-        if text.get('x') == '4' and text.get('y') == '-4':
-            text.decompose()
-
-    for text in soup.find_all('text'):
-        if 'VPN provider' in text.get_text() or 'Security & privacy - score out of 10' in text.get_text():
+        if text.get('x') == '4' or text.get('y') == '-4':
             text.decompose()
 
     background = soup.find('rect', {'id': 'background'})
@@ -121,6 +117,18 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
     metadata.string = source_data.to_json()
     soup.svg.append(metadata)
 
+    # Add SEO metadata
+    seo_metadata = {
+        "@context": "http://schema.org",
+        "@type": "Dataset",
+        "name": seo_title,
+        "description": seo_description,
+        "data": source_data.to_dict(orient='records')
+    }
+    seo_script = soup.new_tag('script', type='application/ld+json')
+    seo_script.string = json.dumps(seo_metadata)
+    soup.svg.append(seo_script)
+
     for rect in rects:
         rect_id = rect['id']
         if rect_id in id_provider_map:
@@ -135,8 +143,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-                    rect['onmouseover'] = "evt.target.style.opacity=0.6"
-                    rect['onmouseout'] = "evt.target.style.opacity=1"
     
     return str(soup)
 
@@ -168,8 +174,10 @@ st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
 uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv")
 measurement_unit = st.text_input("Enter the unit of measurement:")
+seo_title = st.text_input("Enter the SEO title for the visualization:")
+seo_description = st.text_area("Enter the SEO description for the visualization:")
 
-if uploaded_file is not None and uploaded_data is not None and measurement_unit:
+if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
@@ -178,7 +186,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     available_columns = list(source_data.columns)
     value_column = st.selectbox("Select the column to use for values:", available_columns)
 
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
@@ -217,3 +225,4 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
                 file_name=full_name.replace('.svg', '.jpg'),
                 mime="image/jpeg"
             )
+
