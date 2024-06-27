@@ -144,6 +144,17 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
     
+    # Add CSS for highlighting bars on hover
+    style = """
+    <style>
+    rect:hover {
+        stroke: #000000;
+        stroke-width: 2;
+    }
+    </style>
+    """
+    soup.style.append(style)
+
     return str(soup)
 
 def convert_svg_to_jpg(svg_content, output_path):
@@ -205,26 +216,6 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
             file_name=full_name,
             mime="image/svg+xml"
         )
-        
-        # Convert modified SVG to JPG
-        output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
-        st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
-        
-        # Upload to Firebase Storage
-        bucket = storage.bucket()
-        svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
-
-        st.write(f"SVG uploaded to: {svg_url}")
-        st.write(f"JPG uploaded to: {jpg_url}")
-
-        with open(output_jpg_path, "rb") as img_file:
-            st.download_button(
-                label="Download modified JPG",
-                data=img_file,
-                file_name=full_name.replace('.svg', '.jpg'),
-                mime="image/jpeg"
-            )
         
         # Convert modified SVG to JPG
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
