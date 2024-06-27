@@ -64,11 +64,10 @@ def extract_providers_from_labels(soup):
 def extract_bar_ids(soup):
     bar_ids = []
     bars = soup.find_all('rect')
-    for bar in bars:
+    for i, bar in enumerate(bars):
         if 'id' in bar.attrs:
-            bar_ids.append(bar['id'])
+            bar_ids.append(f"{bar['id']}_{i}")  # Add unique suffix to each bar ID
     return bar_ids
-
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
@@ -113,8 +112,9 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
 
     for rect in rects:
         rect_id = rect['id']
-        if rect_id in value_column_mapping:
-            provider_name, csv_column = value_column_mapping[rect_id]
+        rect_id_suffix = f"{rect_id}_{rects.index(rect)}"  # Ensure unique ID for each rect
+        if rect_id_suffix in value_column_mapping:
+            provider_name, csv_column = value_column_mapping[rect_id_suffix]
             if provider_name.lower() in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name.lower()})'
                 if provider_name.lower() in source_data.index:
@@ -136,7 +136,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
 
     return str(soup)
-
 def convert_svg_to_jpg(svg_content, output_path):
     temp_svg_path = 'temp_modified_viz.svg'
     with open(temp_svg_path, 'w') as file:
@@ -157,7 +156,6 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(file_path)
     return blob.public_url
-
 # Streamlit UI
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
