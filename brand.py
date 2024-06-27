@@ -95,6 +95,10 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
         if text.get('x') == '4' and text.get('y') == '-4':
             text.decompose()
 
+    for text in soup.find_all('text'):
+        if 'VPN provider' in text.get_text() or 'Security & privacy - score out of 10' in text.get_text():
+            text.decompose()
+
     background = soup.find('rect', {'id': 'background'})
     if background:
         background['fill'] = '#FFFFFF'
