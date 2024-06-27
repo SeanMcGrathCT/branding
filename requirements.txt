@@ -4,3 +4,4 @@ cairosvg
 pillow
 cairocffi
 lxml
+firebase-admin
