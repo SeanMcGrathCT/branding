@@ -154,6 +154,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
         
         if rect_id in id_provider_map:
             provider_name = id_provider_map[rect_id].title()
+            st.write(f"Processing {rect_id} with provider {provider_name}")
             if provider_name.lower() in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name.lower()})'
                 # Adjust tooltip values based on scaling factor
