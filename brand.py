@@ -160,36 +160,48 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
 
+if "svg_content" not in st.session_state:
+    st.session_state["svg_content"] = None
+if "measurement_unit" not in st.session_state:
+    st.session_state["measurement_unit"] = ""
+if "file_name" not in st.session_state:
+    st.session_state["file_name"] = ""
+if "date" not in st.session_state:
+    st.session_state["date"] = None
+
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
 
 if uploaded_file is not None:
-    svg_content = uploaded_file.read().decode("utf-8")
-    measurement_unit = st.text_input("Enter the measurement unit (e.g., Mbps):", value="Mbps")
+    st.session_state["svg_content"] = uploaded_file.read().decode("utf-8")
 
+st.session_state["measurement_unit"] = st.text_input("Enter the measurement unit (e.g., Mbps):", value=st.session_state["measurement_unit"])
+
+if st.session_state["svg_content"] and st.session_state["measurement_unit"]:
     if st.button("Modify SVG"):
-        modified_svg_content = change_bar_colors(svg_content, measurement_unit)
-        
-        # Prompt user for file name and date
-        file_name = st.text_input("Enter the file name:")
-        date = st.date_input("Enter the date:", value=datetime.today())
+        modified_svg_content = change_bar_colors(st.session_state["svg_content"], st.session_state["measurement_unit"])
+        st.session_state["modified_svg_content"] = modified_svg_content
 
-        if file_name and date:
-            formatted_date = date.strftime("%Y-%m-%d")
-            full_svg_name = f"{file_name}_{formatted_date}.svg"
+    if "modified_svg_content" in st.session_state:
+        st.session_state["file_name"] = st.text_input("Enter the file name:", value=st.session_state["file_name"])
+        st.session_state["date"] = st.date_input("Enter the date:", value=datetime.today() if st.session_state["date"] is None else st.session_state["date"])
+
+        if st.session_state["file_name"] and st.session_state["date"]:
+            formatted_date = st.session_state["date"].strftime("%Y-%m-%d")
+            full_svg_name = f"{st.session_state['file_name']}_{formatted_date}.svg"
             full_jpg_name = full_svg_name.replace('.svg', '.jpg')
             
             with open(full_svg_name, 'w') as f:
-                f.write(modified_svg_content)
+                f.write(st.session_state["modified_svg_content"])
             
             # Convert modified SVG to JPG
-            output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_svg_name)
+            output_jpg_path = convert_svg_to_jpg(st.session_state["modified_svg_content"], full_svg_name)
             
             st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
             
             # Download modified SVG
             st.download_button(
                 label="Download modified SVG",
-                data=modified_svg_content,
+                data=st.session_state["modified_svg_content"],
                 file_name=full_svg_name,
                 mime="image/svg+xml"
             )
