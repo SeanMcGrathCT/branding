@@ -150,6 +150,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
     rect:hover {
         stroke: #000000;
         stroke-width: 2;
+        filter: brightness(1.2);
     }
     </style>
     """
