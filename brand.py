@@ -163,20 +163,16 @@ st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
 
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
 uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv")
-
-if uploaded_data is not None:
-    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
-    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
-    available_columns = list(source_data.columns)
-    value_column = st.selectbox("Select the column to use for values:", available_columns)
-else:
-    value_column = None
-
-mapping_column = st.text_input("Enter the column name for mapping values:")
 measurement_unit = st.text_input("Enter the unit of measurement:")
 
-if uploaded_file is not None and uploaded_data is not None and measurement_unit and value_column:
+if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     svg_content = uploaded_file.read().decode("utf-8")
+    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
+    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
+
+    # Display available columns and let the user select one
+    available_columns = list(source_data.columns)
+    value_column = st.selectbox("Select the column to use for values:", available_columns)
 
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column)
     
