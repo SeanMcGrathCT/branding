@@ -59,9 +59,10 @@ def extract_unique_labels(svg_content):
     
     unique_labels = set()
     for bar in bars:
-        original_id = bar['id']
-        clean_id = original_id.replace("undefined - ", "").strip()
-        unique_labels.add(clean_id)
+        if 'id' in bar.attrs:  # Check if 'id' attribute exists
+            original_id = bar['id']
+            clean_id = original_id.replace("undefined - ", "").strip()
+            unique_labels.add(clean_id)
     
     return list(unique_labels)
 
@@ -118,17 +119,18 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     soup.svg.append(seo_script)
 
     for rect in rects:
-        rect_id = rect['id'].replace("undefined - ", "").strip()
-        if rect_id in value_column_mapping:
-            csv_column = value_column_mapping[rect_id]
-            provider_name = rect_id.split(' ')[0].lower()  # Extract the provider name
-            if provider_name in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name})'
-                if provider_name in source_data.index:
-                    actual_value = source_data.loc[provider_name, csv_column]
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
-                    rect.append(rect_title)
+        if 'id' in rect.attrs:  # Check if 'id' attribute exists
+            rect_id = rect['id'].replace("undefined - ", "").strip()
+            if rect_id in value_column_mapping:
+                csv_column = value_column_mapping[rect_id]
+                provider_name = rect_id.split(' ')[0].lower()  # Extract the provider name
+                if provider_name in vpn_colors:
+                    rect['fill'] = f'url(#gradient-{provider_name})'
+                    if provider_name in source_data.index:
+                        actual_value = source_data.loc[provider_name, csv_column]
+                        rect_title = soup.new_tag('title')
+                        rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
+                        rect.append(rect_title)
 
     # Add CSS for highlighting bars on hover
     style = """
