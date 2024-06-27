@@ -53,22 +53,24 @@ def adjust_brightness(hex_color, factor):
     rgb = [int(max(min(c * (1 + factor), 255), 0)) for c in rgb]
     return f'#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}'
 
-def extract_providers_from_labels(soup):
-    providers = []
-    for g in soup.find_all('g', {'class': 'tick'}):
-        text = g.find('text').get_text().strip().lower()
-        if text in vpn_colors:
-            providers.append(text)
-    return providers
-
-def extract_bar_ids(soup):
-    bar_ids = []
+def extract_unique_labels(svg_content):
+    soup = BeautifulSoup(svg_content, 'xml')
     bars = soup.find_all('rect')
-    for i, bar in enumerate(bars):
-        if 'id' in bar.attrs:
-            unique_id = bar['id'].split('undefined - ')[-1]  # Remove 'undefined - ' prefix
-            bar_ids.append(f"{unique_id}_{i}")  # Add unique suffix to each bar ID
-    return bar_ids
+    
+    unique_labels = set()
+    for bar in bars:
+        original_id = bar['id']
+        clean_id = original_id.replace("undefined - ", "").strip()
+        unique_labels.add(clean_id)
+    
+    return list(unique_labels)
+
+def generate_column_mapping(unique_labels, source_data):
+    value_column_mapping = {}
+    for label in unique_labels:
+        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
+        value_column_mapping[label] = column
+    return value_column_mapping
 
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
@@ -93,6 +95,9 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     else:
         rects = soup.find_all('rect')
 
+    # Ensure all provider names are converted to lower case
+    source_data.index = source_data.index.str.lower()
+
     add_gradients_to_svg(soup, vpn_colors)
 
     # Embed source data as metadata
@@ -113,18 +118,18 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     soup.svg.append(seo_script)
 
     for rect in rects:
-        rect_id = rect['id']
-        rect_id_suffix = f"{rect_id}_{rects.index(rect)}"  # Ensure unique ID for each rect
-        if rect_id_suffix in value_column_mapping:
-            provider_name, csv_column = value_column_mapping[rect_id_suffix]
-            if provider_name.lower() in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-                if provider_name.lower() in source_data.index:
-                    actual_value = source_data.loc[provider_name.lower(), csv_column]
+        rect_id = rect['id'].replace("undefined - ", "").strip()
+        if rect_id in value_column_mapping:
+            csv_column = value_column_mapping[rect_id]
+            provider_name = rect_id.split(' ')[0].lower()  # Extract the provider name
+            if provider_name in vpn_colors:
+                rect['fill'] = f'url(#gradient-{provider_name})'
+                if provider_name in source_data.index:
+                    actual_value = source_data.loc[provider_name, csv_column]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-    
+
     # Add CSS for highlighting bars on hover
     style = """
     <style>
@@ -175,17 +180,13 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
-    # Extract all bar IDs from the SVG for dynamic mapping
-    soup = BeautifulSoup(svg_content, 'xml')
-    bar_ids = extract_bar_ids(soup)
+    # Extract unique labels from the SVG
+    unique_labels = extract_unique_labels(svg_content)
 
-    # Create a dictionary to map each bar ID to a CSV column
-    value_column_mapping = {}
-    for i, bar_id in enumerate(bar_ids):
-        unique_id = bar_id.split('undefined - ')[-1]  # Remove 'undefined - ' prefix
-        provider_name = unique_id.split(' - ')[0].lower()
-        value_column_mapping[bar_id] = (provider_name, st.selectbox(f"Select the column for {unique_id}:", list(source_data.columns), key=f"{bar_id}_{i}"))
+    # Generate column mapping using Streamlit selectbox
+    value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
+    # Apply the column mapping to change bar colors
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
     # Prompt user for file name and date
