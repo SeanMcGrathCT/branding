@@ -82,7 +82,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, source_data):
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -127,7 +127,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data):
                 rect_height = float(rect['height'])
                 normalized_provider_name = provider_name.lower()
                 if normalized_provider_name in source_data.index:
-                    actual_value = source_data.loc[normalized_provider_name, source_data.columns[0]]
+                    actual_value = source_data.loc[normalized_provider_name, value_column]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
@@ -171,7 +171,11 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data)
+    # Display available columns and let the user select one
+    available_columns = list(source_data.columns)
+    value_column = st.selectbox("Select the column to use for values:", available_columns)
+
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
@@ -208,5 +212,4 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
                 label="Download modified JPG",
                 data=img_file,
                 file_name=full_name.replace('.svg', '.jpg'),
-                mime="image/jpeg"
-            )
+                mime="image
