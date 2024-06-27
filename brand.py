@@ -82,6 +82,26 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
+def extract_unique_labels(svg_content):
+    soup = BeautifulSoup(svg_content, 'xml')
+    bars = soup.find_all('rect')
+    
+    unique_labels = set()
+    for bar in bars:
+        if 'id' in bar.attrs:  # Check if 'id' attribute exists
+            original_id = bar['id']
+            clean_id = original_id.replace("undefined - ", "").strip()
+            unique_labels.add(clean_id)
+    
+    return list(unique_labels)
+
+def generate_column_mapping(unique_labels, source_data):
+    value_column_mapping = {}
+    for label in unique_labels:
+        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
+        value_column_mapping[label] = column
+    return value_column_mapping
+
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
