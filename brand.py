@@ -152,6 +152,8 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     seo_script.string = json.dumps(seo_metadata)
     soup.svg.append(seo_script)
 
+    st.write("Value Column Mapping:", value_column_mapping)
+
     for rect in rects:
         rect_id = rect['id']
         
@@ -163,7 +165,8 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
                 # Adjust tooltip values based on scaling factor
                 normalized_provider_name = provider_name.lower()
                 if normalized_provider_name in source_data.index:
-                    column_name = value_column_mapping.get(normalized_provider_name)
+                    column_name = value_column_mapping.get(provider_name.lower())
+                    st.write(f"Provider: {provider_name}, Column Mapping: {column_name}")
                     if column_name:
                         actual_value = source_data.loc[normalized_provider_name, column_name]
                         st.write(f"Provider: {provider_name}, Column: {column_name}, Value: {actual_value}")
@@ -174,8 +177,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
                         st.write(f"No column mapping found for provider: {normalized_provider_name}")
                 else:
                     st.write(f"Provider {normalized_provider_name} not found in source data index.")
-    
-    # Add CSS for highlighting bars on hover
+        # Add CSS for highlighting bars on hover
     style = """
     <style>
     rect:hover {
@@ -227,14 +229,10 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
 
     # Extract unique labels from the SVG
     unique_labels = extract_unique_labels(svg_content)
-
-    # Debugging: Print unique labels
     st.write("Unique Labels from SVG:", unique_labels)
 
     # Generate column mapping using Streamlit selectbox
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
-
-    # Debugging: Print column mapping
     st.write("Value Column Mapping:", value_column_mapping)
 
     # Apply the column mapping to change bar colors
