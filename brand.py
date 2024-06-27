@@ -97,9 +97,10 @@ def extract_unique_labels(svg_content):
 
 def generate_column_mapping(unique_labels, source_data):
     value_column_mapping = {}
-    for label in unique_labels:
-        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
-        value_column_mapping[label] = column
+    for provider in vpn_colors.keys():
+        if provider in unique_labels:
+            column = st.selectbox(f"Select the column for {provider}:", list(source_data.columns), key=provider)
+            value_column_mapping[provider] = column
     return value_column_mapping
 
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
@@ -225,8 +226,14 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     # Extract unique labels from the SVG
     unique_labels = extract_unique_labels(svg_content)
 
+    # Debugging: Print unique labels
+    st.write("Unique Labels from SVG:", unique_labels)
+
     # Generate column mapping using Streamlit selectbox
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
+
+    # Debugging: Print column mapping
+    st.write("Value Column Mapping:", value_column_mapping)
 
     # Apply the column mapping to change bar colors
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
