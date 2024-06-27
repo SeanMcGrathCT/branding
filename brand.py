@@ -120,20 +120,19 @@ def change_bar_colors(svg_content, measurement_unit, source_data):
     for rect in rects:
         rect_id = rect['id']
         if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id]
-            if provider_name in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name})'
+            provider_name = id_provider_map[rect_id].title()
+            if provider_name.lower() in vpn_colors:
+                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
                 # Adjust tooltip values based on scaling factor
                 rect_height = float(rect['height'])
-                provider_title = provider_name.title()
-                if provider_title in source_data.index:
-                    actual_value = source_data.loc[provider_title, source_data.columns[0]]
+                if provider_name in source_data.index:
+                    actual_value = source_data.loc[provider_name, source_data.columns[0]]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
                     print(f"Added tooltip for {provider_name} with value {actual_value:.2f}")
                 else:
-                    print(f"No data found for provider {provider_title}")
+                    print(f"No data found for provider {provider_name}")
     
     return str(soup)
 
@@ -151,6 +150,12 @@ def convert_svg_to_jpg(svg_content, output_path):
         img.save(output_jpg_path, 'JPEG')
 
     return output_jpg_path
+
+def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
+    """Uploads a file to the bucket."""
+    blob = bucket.blob(destination_blob_name)
+    blob.upload_from_filename(file_path)
+    return blob.public_url
 
 # Streamlit UI
 st.title("Visualization Branding Tool")
@@ -198,9 +203,3 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
                 file_name=full_name.replace('.svg', '.jpg'),
                 mime="image/jpeg"
             )
-
-def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
-    """Uploads a file to the bucket."""
-    blob = bucket.blob(destination_blob_name)
-    blob.upload_from_filename(file_path)
-    return blob.public_url
