@@ -81,7 +81,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, source_data):
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -111,10 +111,11 @@ def change_bar_colors(svg_content, measurement_unit, source_data):
 
     id_provider_map = map_bars_to_providers(soup, providers)
 
-    # Embed source data as metadata
-    metadata = soup.new_tag('metadata')
-    metadata.string = source_data.to_json()
-    soup.svg.append(metadata)
+    # Determine the scaling factor
+    y_ticks = soup.find_all('g', {'class': 'tick'})
+    y_tick_values = [tick.find('text').get_text() for tick in y_ticks if tick.find('text')]
+    max_tick_value = max([float(value) for value in y_tick_values])
+    scaling_factor = max_tick_value / 10  # Assuming the original scale is 1-10
 
     for rect in rects:
         rect_id = rect['id']
@@ -126,17 +127,10 @@ def change_bar_colors(svg_content, measurement_unit, source_data):
                 rect_height = float(rect['height'])
                 provider_title = provider_name.title()
                 if provider_title in source_data.index:
-                    actual_value = source_data.loc[provider_title, 'Value']
+                    actual_value = source_data.loc[provider_title, value_column]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-                else:
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"Value not available"
-                    rect.append(rect_title)
-                # Highlight bar on hover
-                rect['onmouseover'] = "this.style.fillOpacity=0.8"
-                rect['onmouseout'] = "this.style.fillOpacity=1.0"
 
     return str(soup)
 
@@ -163,51 +157,52 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
 
 # Streamlit UI
 st.title("Visualization Branding Tool")
-st.write("Upload an SVG file and its source data to modify its bar colors based on VPN providers.")
+st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
 
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
-uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv")
-measurement_unit = st.text_input("Enter the unit of measurement:")
+uploaded_data = st.file_uploader("Choose a CSV file with the source data", type="csv")
+measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):")
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data)
-    
-    # Prompt user for file name and date
-    file_name = st.text_input("Enter the file name:")
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    
-    if file_name:
-        full_name = f"{file_name}_{current_date}.svg"
-        
-        # Convert modified SVG to JPG
-        output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
-        
-        st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
+    value_column = st.selectbox("Select the column for values", source_data.columns)
 
-        # Download modified SVG
-        st.download_button(
-            label="Download modified SVG",
-            data=modified_svg_content,
-            file_name=full_name,
-            mime="image/svg+xml"
-        )
-        
-        # Download modified JPG
-        with open(output_jpg_path, "rb") as img_file:
+    if value_column:
+        modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column)
+
+        # Prompt user for file name and date
+        file_name = st.text_input("Enter the file name:")
+        current_date = datetime.now().strftime("%Y-%m-%d")
+
+        if file_name:
+            full_name = f"{file_name}_{current_date}.svg"
+            output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
+
+            st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
+
+            # Download modified SVG
             st.download_button(
-                label="Download modified JPG",
-                data=img_file,
-                file_name=full_name.replace('.svg', '.jpg'),
-                mime="image/jpeg"
+                label="Download modified SVG",
+                data=modified_svg_content,
+                file_name=full_name,
+                mime="image/svg+xml"
             )
 
-        # Upload to Firebase Storage
-        bucket = storage.bucket()
-        svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_name.replace('.svg', '.jpg'))
-        
-        st.write(f"SVG uploaded to: {svg_url}")
-        st.write(f"JPG uploaded to: {jpg_url}")
+            # Download modified JPG
+            with open(output_jpg_path, "rb") as img_file:
+                st.download_button(
+                    label="Download modified JPG",
+                    data=img_file,
+                    file_name=full_name.replace('.svg', '.jpg'),
+                    mime="image/jpeg"
+                )
+
+            # Upload to Firebase Storage
+            bucket = storage.bucket()
+            svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
+            jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
+
+            st.write(f"SVG uploaded to: {svg_url}")
+            st.write(f"JPG uploaded to: {jpg_url}")
