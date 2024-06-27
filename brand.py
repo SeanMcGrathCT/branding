@@ -218,7 +218,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
 
         with open(output_jpg_path, "rb") as img_file:
             st.download_button(
-                label="Download
+                label="Download"
         
         # Upload to Firebase Storage
         bucket = storage.bucket()
