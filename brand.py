@@ -119,10 +119,20 @@ def change_bar_colors(svg_content):
                 rect['fill'] = f'url(#gradient-{provider_name})'
                 
             # Add tooltip with Y-axis value
-            y_value = float(rect['y']) + float(rect['height'])
+            y_value = float(rect['y'])
             title = soup.new_tag('title')
             title.string = f'Value: {y_value}'
             rect.append(title)
+
+    # Add hover effect using CSS
+    style = soup.new_tag('style')
+    style.string = """
+    rect:hover {
+        opacity: 0.7;
+        cursor: pointer;
+    }
+    """
+    soup.svg.insert(0, style)
 
     return str(soup)
 
