@@ -9,7 +9,7 @@ from datetime import datetime
 
 # Initialize Firebase
 if not firebase_admin._apps:
-    firebase_credentials = json.loads(st.secrets["FIREBASE_CREDENTIALS"].to_json())
+    firebase_credentials = json.loads(st.secrets["FIREBASE_CREDENTIALS"])
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
         'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
@@ -119,7 +119,7 @@ def change_bar_colors(svg_content, measurement_unit):
                 rect['fill'] = f'url(#gradient-{provider_name})'
                 
             # Add tooltip with Y-axis value
-            y_value = float(rect['y'])
+            y_value = float(rect['height'])
             title = soup.new_tag('title')
             title.string = f'Value: {y_value:.2f} {measurement_unit}'
             rect.append(title)
