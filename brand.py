@@ -53,36 +53,27 @@ def adjust_brightness(hex_color, factor):
     rgb = [int(max(min(c * (1 + factor), 255), 0)) for c in rgb]
     return f'#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}'
 
-def extract_providers_from_labels(soup):
-    providers = []
-    for g in soup.find_all('g', {'class': 'tick'}):
-        text = g.find('text').get_text().strip().lower()
-        if text in vpn_colors:
-            providers.append(text)
-    return providers
-
-def map_bars_to_providers(soup, providers):
-    id_provider_map = {}
-    ticks = soup.find_all('g', {'class': 'tick'})
-    
-    # Extract positions of the labels
-    label_positions = [float(tick['transform'].split('(')[1].split(',')[0]) for tick in ticks if tick.find('text').get_text().strip().lower() in vpn_colors]
-    provider_label_map = {pos: providers[i] for i, pos in enumerate(label_positions)}
-    
-    # Map each bar to the closest label based on x position
+def extract_unique_labels(svg_content):
+    soup = BeautifulSoup(svg_content, 'xml')
     bars = soup.find_all('rect')
-    for i, bar in enumerate(bars):
-        if 'x' in bar.attrs:
-            bar_x = float(bar['x'])
-            closest_label_position = min(label_positions, key=lambda pos: abs(pos - bar_x))
-            provider = provider_label_map[closest_label_position]
-            bar_id = f'bar-{i}'  # Create a unique id based on the index
-            bar['id'] = bar_id
-            id_provider_map[bar_id] = provider
     
-    return id_provider_map
+    unique_labels = set()
+    for bar in bars:
+        if 'id' in bar.attrs:  # Check if 'id' attribute exists
+            original_id = bar['id']
+            clean_id = original_id.replace("undefined - ", "").strip()
+            unique_labels.add(clean_id)
+    
+    return list(unique_labels)
 
-def change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description):
+def generate_column_mapping(unique_labels, source_data):
+    value_column_mapping = {}
+    for label in unique_labels:
+        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
+        value_column_mapping[label] = column
+    return value_column_mapping
+
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -105,12 +96,10 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
     else:
         rects = soup.find_all('rect')
 
-    providers = extract_providers_from_labels(soup)
-    provider_map = {provider: i for i, provider in enumerate(providers)}
+    # Ensure all provider names are converted to lower case
+    source_data.index = source_data.index.str.lower()
 
     add_gradients_to_svg(soup, vpn_colors)
-
-    id_provider_map = map_bars_to_providers(soup, providers)
 
     # Embed source data as metadata
     metadata = soup.new_tag('metadata')
@@ -130,20 +119,19 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
     soup.svg.append(seo_script)
 
     for rect in rects:
-        rect_id = rect['id']
-        if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id].title()
-            if provider_name.lower() in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-                # Adjust tooltip values based on scaling factor
-                rect_height = float(rect['height'])
-                normalized_provider_name = provider_name.lower()
-                if normalized_provider_name in source_data.index:
-                    actual_value = source_data.loc[normalized_provider_name, value_column]
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
-                    rect.append(rect_title)
-    
+        if 'id' in rect.attrs:  # Check if 'id' attribute exists
+            rect_id = rect['id'].replace("undefined - ", "").strip()
+            if rect_id in value_column_mapping:
+                csv_column = value_column_mapping[rect_id]
+                provider_name = rect_id.split('_')[0].lower()  # Extract the provider name
+                if provider_name in vpn_colors:
+                    rect['fill'] = f'url(#gradient-{provider_name})'
+                    if provider_name in source_data.index:
+                        actual_value = source_data.loc[provider_name, csv_column]
+                        rect_title = soup.new_tag('title')
+                        rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
+                        rect.append(rect_title)
+
     # Add CSS for highlighting bars on hover
     style = """
     <style>
@@ -155,34 +143,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column, 
     </style>
     """
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
-
-    return str(soup)
-
-    for rect in rects:
-        rect_id = rect['id']
-        if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id].title()
-            if provider_name.lower() in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-                # Adjust tooltip values based on scaling factor
-                rect_height = float(rect['height'])
-                normalized_provider_name = provider_name.lower()
-                if normalized_provider_name in source_data.index:
-                    actual_value = source_data.loc[normalized_provider_name, value_column]
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
-                    rect.append(rect_title)
-    
-    # Add CSS for highlighting bars on hover
-    style = """
-    <style>
-    rect:hover {
-        stroke: #000000;
-        stroke-width: 2;
-    }
-    </style>
-    """
-    soup.style.append(style)
 
     return str(soup)
 
@@ -222,11 +182,14 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
-    # Display available columns and let the user select one
-    available_columns = list(source_data.columns)
-    value_column = st.selectbox("Select the column to use for values:", available_columns)
+    # Extract unique labels from the SVG
+    unique_labels = extract_unique_labels(svg_content)
 
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description)
+    # Generate column mapping using Streamlit selectbox
+    value_column_mapping = generate_column_mapping(unique_labels, source_data)
+
+    # Apply the column mapping to change bar colors
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
@@ -249,7 +212,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         # Convert modified SVG to JPG
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
-        
+
         # Upload to Firebase Storage
         bucket = storage.bucket()
         svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
