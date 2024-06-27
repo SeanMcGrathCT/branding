@@ -226,17 +226,6 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
                 mime="image/jpeg"
             )
         
-        # Save modified SVG
-        with open(full_name, 'w') as file:
-            file.write(modified_svg_content)
-        
-        st.download_button(
-            label="Download modified SVG",
-            data=modified_svg_content,
-            file_name=full_name,
-            mime="image/svg+xml"
-        )
-        
         # Convert modified SVG to JPG
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
