@@ -212,4 +212,5 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
                 label="Download modified JPG",
                 data=img_file,
                 file_name=full_name.replace('.svg', '.jpg'),
-                mime="image
+                mime="image/jpeg"
+            )
