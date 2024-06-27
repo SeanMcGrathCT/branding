@@ -217,8 +217,11 @@ if uploaded_file is not None and uploaded_data is not None:
 
             st.write(f"SVG uploaded to: {svg_url}")
             st.write(f"JPG uploaded to: {jpg_url}")
-
+            
             with open(output_jpg_path, "rb") as img_file:
                 st.download_button(
                     label="Download modified JPG",
                     data=img_file,
+                    file_name=full_name.replace('.svg &#8203;:citation[oaicite:0]{index=0}&#8203;
+                    mime="image/jpeg"
+            )
