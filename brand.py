@@ -66,7 +66,8 @@ def extract_bar_ids(soup):
     bars = soup.find_all('rect')
     for i, bar in enumerate(bars):
         if 'id' in bar.attrs:
-            bar_ids.append(f"{bar['id']}_{i}")  # Add unique suffix to each bar ID
+            unique_id = bar['id'].split('undefined - ')[-1]  # Remove 'undefined - ' prefix
+            bar_ids.append(f"{unique_id}_{i}")  # Add unique suffix to each bar ID
     return bar_ids
 
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
@@ -181,8 +182,9 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     # Create a dictionary to map each bar ID to a CSV column
     value_column_mapping = {}
     for i, bar_id in enumerate(bar_ids):
-        provider_name = bar_id.split(' - ')[0].lower()
-        value_column_mapping[bar_id] = (provider_name, st.selectbox(f"Select the column for {bar_id}:", list(source_data.columns), key=f"{bar_id}_{i}"))
+        unique_id = bar_id.split('undefined - ')[-1]  # Remove 'undefined - ' prefix
+        provider_name = unique_id.split(' - ')[0].lower()
+        value_column_mapping[bar_id] = (provider_name, st.selectbox(f"Select the column for {unique_id}:", list(source_data.columns), key=f"{bar_id}_{i}"))
 
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
@@ -207,7 +209,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         # Convert modified SVG to JPG
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
-        
+
         # Upload to Firebase Storage
         bucket = storage.bucket()
         svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
