@@ -157,10 +157,9 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
             if provider_name.lower() in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name.lower()})'
                 # Adjust tooltip values based on scaling factor
-                rect_height = float(rect['height'])
                 normalized_provider_name = provider_name.lower()
                 if normalized_provider_name in source_data.index:
-                    column_name = value_column_mapping.get(provider_name.lower())
+                    column_name = value_column_mapping.get(normalized_provider_name)
                     if column_name:
                         actual_value = source_data.loc[normalized_provider_name, column_name]
                         rect_title = soup.new_tag('title')
