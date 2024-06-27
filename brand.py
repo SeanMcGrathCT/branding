@@ -120,16 +120,17 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column):
         rect_id = rect['id']
         if rect_id in id_provider_map:
             provider_name = id_provider_map[rect_id]
+            print(f"Processing bar {rect_id} for provider {provider_name}")
             if provider_name in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name})'
                 # Adjust tooltip values based on scaling factor
-                rect_height = float(rect['height'])
                 provider_title = provider_name.title()
                 if provider_title in source_data.index:
                     actual_value = source_data.loc[provider_title, value_column]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
+                    print(f"Added tooltip for {provider_name} with value {actual_value}")
 
     return str(soup)
 
