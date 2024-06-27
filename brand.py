@@ -5,7 +5,6 @@ import json
 import cairosvg
 from PIL import Image
 from bs4 import BeautifulSoup
-import tempfile
 from datetime import datetime
 
 # Initialize Firebase
