@@ -162,9 +162,14 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
                     column_name = value_column_mapping.get(normalized_provider_name)
                     if column_name:
                         actual_value = source_data.loc[normalized_provider_name, column_name]
+                        st.write(f"Provider: {provider_name}, Column: {column_name}, Value: {actual_value}")
                         rect_title = soup.new_tag('title')
                         rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                         rect.append(rect_title)
+                    else:
+                        st.write(f"No column mapping found for provider: {normalized_provider_name}")
+                else:
+                    st.write(f"Provider {normalized_provider_name} not found in source data index.")
     
     # Add CSS for highlighting bars on hover
     style = """
@@ -214,39 +219,8 @@ seo_description = st.text_area("Enter the SEO description for the visualization:
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
-    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
+    source_data.index = source_data.index.str
 
-    # Extract unique labels from the SVG
-    unique_labels = extract_unique_labels(svg_content)
-
-    # Generate column mapping using Streamlit selectbox
-    value_column_mapping = generate_column_mapping(unique_labels, source_data)
-
-    # Apply the column mapping to change bar colors
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
-    
-    # Prompt user for file name and date
-    file_name = st.text_input("Enter the file name:")
-    current_date = datetime.now().strftime("%Y-%m-%d")
-
-    if file_name:
-        full_name = f"{file_name}_{current_date}.svg"
-        
-        # Save modified SVG
-        with open(full_name, 'w') as file:
-            file.write(modified_svg_content)
-        
-        st.download_button(
-            label="Download modified SVG",
-            data=modified_svg_content,
-            file_name=full_name,
-            mime="image/svg+xml"
-        )
-        
-        # Convert modified SVG to JPG
-        output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
-        st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
-        
         # Upload to Firebase Storage
         bucket = storage.bucket()
         svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
