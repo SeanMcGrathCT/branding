@@ -118,6 +118,12 @@ def change_bar_colors(svg_content):
             provider_name = id_provider_map[rect_id]
             if provider_name in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name})'
+                
+            # Add tooltip with Y-axis value
+            y_value = float(rect['y']) + float(rect['height'])
+            title = soup.new_tag('title')
+            title.string = f'Value: {y_value}'
+            rect.append(title)
 
     return str(soup)
 
