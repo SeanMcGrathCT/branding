@@ -5,6 +5,7 @@ import cairosvg
 from PIL import Image
 from bs4 import BeautifulSoup
 from datetime import datetime
+import pandas as pd
 
 # Initialize Firebase
 if not firebase_admin._apps:
@@ -80,7 +81,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, max_data_value):
+def change_bar_colors(svg_content, measurement_unit, source_data):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -110,10 +111,10 @@ def change_bar_colors(svg_content, measurement_unit, max_data_value):
 
     id_provider_map = map_bars_to_providers(soup, providers)
 
-    # Determine the scaling factor
-    svg_height = float(soup.svg['height'])
-    max_svg_bar_height = max(float(rect['height']) for rect in rects)
-    scaling_factor = max_data_value / max_svg_bar_height
+    # Embed source data as metadata
+    metadata = soup.new_tag('metadata')
+    metadata.string = source_data.to_json()
+    soup.svg.append(metadata)
 
     for rect in rects:
         rect_id = rect['id']
@@ -121,9 +122,8 @@ def change_bar_colors(svg_content, measurement_unit, max_data_value):
             provider_name = id_provider_map[rect_id]
             if provider_name in vpn_colors:
                 rect['fill'] = f'url(#gradient-{provider_name})'
-                # Adjust tooltip values based on scaling factor
-                rect_height = float(rect['height'])
-                actual_value = rect_height * scaling_factor
+                # Adjust tooltip values based on source data
+                actual_value = source_data.loc[provider_name.title()]['Value']
                 rect_title = soup.new_tag('title')
                 rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
                 rect.append(rect_title)
@@ -156,16 +156,17 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
 
 # Streamlit UI
 st.title("Visualization Branding Tool")
-st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
+st.write("Upload an SVG file and its source data to modify its bar colors based on VPN providers.")
 
 uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
+uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv")
 measurement_unit = st.text_input("Enter the unit of measurement:")
-max_data_value = st.number_input("Enter the maximum value in your data:", min_value=0.0, step=0.1)
 
-if uploaded_file is not None and measurement_unit and max_data_value:
+if uploaded_file is not None and uploaded_data is not None and measurement_unit:
     svg_content = uploaded_file.read().decode("utf-8")
+    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, max_data_value)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
