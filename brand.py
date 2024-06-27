@@ -180,8 +180,10 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
             full_name = f"{file_name}_{current_date}.svg"
             with open(full_name, 'w') as file:
                 file.write(modified_svg_content)
+            print(f"Saved modified SVG as {full_name}")
 
             output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
+            print(f"Converted SVG to JPG: {output_jpg_path}")
 
             st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
 
@@ -203,9 +205,12 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit:
                 )
 
             # Upload to Firebase Storage
-            bucket = storage.bucket()
-            svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-            jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_name.replace('.svg', '.jpg'))
-
-            st.write(f"SVG uploaded to: {svg_url}")
-            st.write(f"JPG uploaded to: {jpg_url}")
+            try:
+                bucket = storage.bucket()
+                svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
+                jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, full_name.replace('.svg', '.jpg'))
+                st.write(f"SVG uploaded to: {svg_url}")
+                st.write(f"JPG uploaded to: {jpg_url}")
+            except Exception as e:
+                st.write(f"Failed to upload to Firebase Storage: {e}")
+                print(f"Failed to upload to Firebase Storage: {e}")
