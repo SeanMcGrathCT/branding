@@ -1,4 +1,4 @@
-import streamlit as st
+mport streamlit as st
 import pandas as pd
 import cairosvg
 from PIL import Image
@@ -61,15 +61,15 @@ def extract_providers_from_labels(soup):
             providers.append(text)
     return providers
 
-def map_bars_to_providers_and_metrics(soup, providers):
-    id_provider_metric_map = {}
+def map_bars_to_providers(soup, providers):
+    id_provider_map = {}
     ticks = soup.find_all('g', {'class': 'tick'})
     
     # Extract positions of the labels
     label_positions = [float(tick['transform'].split('(')[1].split(',')[0]) for tick in ticks if tick.find('text').get_text().strip().lower() in vpn_colors]
     provider_label_map = {pos: providers[i] for i, pos in enumerate(label_positions)}
     
-    # Map each bar to the closest label based on x position and extract metric
+    # Map each bar to the closest label based on x position
     bars = soup.find_all('rect')
     for i, bar in enumerate(bars):
         if 'x' in bar.attrs:
@@ -78,12 +78,31 @@ def map_bars_to_providers_and_metrics(soup, providers):
             provider = provider_label_map[closest_label_position]
             bar_id = f'bar-{i}'  # Create a unique id based on the index
             bar['id'] = bar_id
-            metric = bar['id'].split(" - ")[1].lower()  # Extract the metric name from the bar ID
-            id_provider_metric_map[bar_id] = (provider, metric)
+            id_provider_map[bar_id] = provider
     
-    return id_provider_metric_map
+    return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo_description):
+def extract_unique_labels(svg_content):
+    soup = BeautifulSoup(svg_content, 'xml')
+    bars = soup.find_all('rect')
+    
+    unique_labels = set()
+    for bar in bars:
+        if 'id' in bar.attrs:  # Check if 'id' attribute exists
+            original_id = bar['id']
+            clean_id = original_id.replace("undefined - ", "").strip()
+            unique_labels.add(clean_id)
+    
+    return list(unique_labels)
+
+def generate_column_mapping(unique_labels, source_data):
+    value_column_mapping = {}
+    for label in unique_labels:
+        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
+        value_column_mapping[label] = column
+    return value_column_mapping
+
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -111,7 +130,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo
 
     add_gradients_to_svg(soup, vpn_colors)
 
-    id_provider_metric_map = map_bars_to_providers_and_metrics(soup, providers)
+    id_provider_map = map_bars_to_providers(soup, providers)
     
     # Embed source data as metadata
     metadata = soup.new_tag('metadata')
@@ -132,19 +151,20 @@ def change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo
 
     for rect in rects:
         rect_id = rect['id']
-        if rect_id in id_provider_metric_map:
-            provider_name, metric = id_provider_metric_map[rect_id]
-            if provider_name in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name})'
-                # Adjust tooltip values based on the metric
-                if provider_name in source_data.index and metric in source_data.columns:
-                    actual_value = source_data.loc[provider_name, metric]
-                    st.write(f"Processing {rect_id} with provider {provider_name.capitalize()} and metric {metric}")
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"{metric.capitalize()}: {actual_value:.2f} {measurement_unit}"
-                    rect.append(rect_title)
-                else:
-                    st.write(f"No data found for provider: {provider_name} and metric: {metric}")
+        
+        if rect_id in id_provider_map:
+            provider_name = id_provider_map[rect_id].title()
+            if provider_name.lower() in vpn_colors:
+                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
+                # Adjust tooltip values based on scaling factor
+                normalized_provider_name = provider_name.lower()
+                if normalized_provider_name in source_data.index:
+                    column_name = value_column_mapping.get(rect_id)
+                    if column_name:
+                        actual_value = source_data.loc[normalized_provider_name, column_name]
+                        rect_title = soup.new_tag('title')
+                        rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
+                        rect.append(rect_title)
     
     # Add CSS for highlighting bars on hover
     style = """
