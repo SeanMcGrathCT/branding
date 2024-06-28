@@ -196,11 +196,12 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
                 rect = soup.find(id=bar_id)
                 if rect:
                     rect_title = soup.new_tag('title')
-                    rect_title.string = f"{provider} - {column_name}: {value:.2f} {measurement_unit}"
+                    rect_title.string = f"{provider.title()} - {column_name}: {value:.2f} {measurement_unit}"
                     rect.append(rect_title)
+                    print(f"Assigned tooltip: {rect_title.string}")  # Log the tooltip assignment for verification
     
     return str(soup)
-    
+
 def convert_svg_to_jpg(svg_content, output_path):
     temp_svg_path = 'temp_modified_viz.svg'
     with open(temp_svg_path, 'w') as file:
