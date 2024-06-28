@@ -88,7 +88,7 @@ def extract_unique_labels(svg_content):
     
     unique_labels = set()
     for bar in bars:
-        if 'id' in bar.attrs and 'background' not in bar.attrs['id']:  # Exclude background
+        if 'id' in bar.attrs:  # Check if 'id' attribute exists
             original_id = bar['id']
             clean_id = original_id.replace("undefined - ", "").strip()
             unique_labels.add(clean_id)
@@ -182,17 +182,16 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
 
     id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
     
-    # Assign tooltips based on bar heights and corresponding values
     for provider in extract_providers_from_labels(soup):
         provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
         provider_data = source_data.loc[provider]
 
-        # Sort the bars by height and the data by value
         sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1], reverse=True)
-        sorted_values = sorted(provider_data.items(), key=lambda x: x[1], reverse=True)
+        sorted_values = sorted(provider_data.items(), key=lambda x: x[1], reverse=True)[:len(sorted_bars)]
 
-        # Ensure the sorted values match the number of bars
-        sorted_values = sorted_values[:len(sorted_bars)]
+        st.write(f"Provider: {provider}")
+        st.write(f"Sorted Bars: {sorted_bars}")
+        st.write(f"Sorted Values: {sorted_values}")
 
         if len(sorted_bars) == len(sorted_values):
             for (bar_id, _), (column_name, value) in zip(sorted_bars, sorted_values):
@@ -289,3 +288,6 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
                 file_name=full_name.replace('.svg', '.jpg'),
                 mime="image/jpeg"
             )
+
+# Ensure to include logging for each step
+st.write("Log:")
