@@ -196,9 +196,10 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
                 rect = soup.find(id=bar_id)
                 if rect:
                     rect_title = soup.new_tag('title')
-                    rect_title.string = f"{provider.title()} - {column_name}: {value:.2f} {measurement_unit}"
+                    rect_title.string = f"{provider} - {column_name}: {value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-                    print(f"Assigned tooltip: {rect_title.string}")  # Log the tooltip assignment for verification
+                    # Logging for debugging
+                    print(f"Assigned tooltip: {rect_title.string}")
     
     return str(soup)
 
@@ -217,7 +218,8 @@ def convert_svg_to_jpg(svg_content, output_path):
 
     return output_jpg_path
 
-def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
+def upload_to_firebase_storage(file_path, bucket,
+destination_blob_name):
     """Uploads a file to the bucket."""
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(file_path)
