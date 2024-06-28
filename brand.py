@@ -133,7 +133,6 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
 
     id_provider_map = map_bars_to_providers(soup, providers)
 
-    # Create a mapping of bar heights to values for each provider
     for provider in providers:
         provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
         provider_data = source_data.loc[provider]
@@ -142,7 +141,16 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
         sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1])
         sorted_values = sorted(provider_data.items(), key=lambda x: x[1])
 
-        # Create a mapping of bar ids to data columns
+        # Debugging information
+        print(f"Provider: {provider}")
+        print(f"Sorted bars: {sorted_bars}")
+        print(f"Sorted values: {sorted_values}")
+
+        # Handle cases where the lengths might not match
+        if len(sorted_bars) != len(sorted_values):
+            print(f"Length mismatch for provider {provider}: {len(sorted_bars)} bars, {len(sorted_values)} values")
+            continue
+
         bar_value_mapping = {sorted_bars[i][0]: sorted_values[i][0] for i in range(len(sorted_bars))}
 
         # Assign colors and tooltips to bars
@@ -152,12 +160,10 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
                 provider_name = id_provider_map[rect_id].title()
                 if provider_name.lower() in vpn_colors:
                     rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-                    # Get the actual value from the source data
                     actual_value = provider_data[column_name]
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"{provider_name} - {column_name}: {actual_value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-
     # Add CSS for highlighting bars on hover
     style = """
     <style>
