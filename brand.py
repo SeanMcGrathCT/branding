@@ -93,7 +93,7 @@ def extract_unique_labels(svg_content):
             clean_id = original_id.replace("undefined - ", "").strip()
             unique_labels.add(clean_id)
     
-    return list(unique_labels}
+    return list(unique_labels)
 
 def generate_column_mapping(unique_labels, source_data):
     value_column_mapping = {}
