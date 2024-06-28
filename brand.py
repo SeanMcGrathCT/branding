@@ -93,7 +93,7 @@ def extract_unique_labels(svg_content):
             clean_id = original_id.replace("undefined - ", "").strip()
             unique_labels.add(clean_id)
     
-    return list(unique_labels)
+    return list(unique_labels}
 
 def generate_column_mapping(unique_labels, source_data):
     value_column_mapping = {}
@@ -102,7 +102,6 @@ def generate_column_mapping(unique_labels, source_data):
         value_column_mapping[label] = column
     return value_column_mapping
 
-# Updated function for changing bar colors and assigning tooltips
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
@@ -132,38 +131,32 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     add_gradients_to_svg(soup, vpn_colors)
 
     id_provider_map = map_bars_to_providers(soup, providers)
+    
+    # Embed source data as metadata
+    metadata = soup.new_tag('metadata')
+    metadata.string = source_data.to_json()
+    soup.svg.append(metadata)
 
-    for provider in providers:
-        provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
-        provider_data = source_data.loc[provider]
+    # Add SEO metadata
+    seo_metadata = {
+        "@context": "http://schema.org",
+        "@type": "Dataset",
+        "name": seo_title,
+        "description": seo_description,
+        "data": source_data.to_dict(orient='records')
+    }
+    seo_script = soup.new_tag('script', type='application/ld+json')
+    seo_script.string = json.dumps(seo_metadata)
+    soup.svg.append(seo_script)
 
-        # Sort the bars by height and the data by value
-        sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1])
-        sorted_values = sorted(provider_data.items(), key=lambda x: x[1])
-
-        # Debugging information
-        print(f"Provider: {provider}")
-        print(f"Sorted bars: {sorted_bars}")
-        print(f"Sorted values: {sorted_values}")
-
-        # Handle cases where the lengths might not match
-        if len(sorted_bars) != len(sorted_values):
-            print(f"Length mismatch for provider {provider}: {len(sorted_bars)} bars, {len(sorted_values)} values")
-            continue
-
-        bar_value_mapping = {sorted_bars[i][0]: sorted_values[i][0] for i in range(len(sorted_bars))}
-
-        # Assign colors and tooltips to bars
-        for rect_id, column_name in bar_value_mapping.items():
-            rect = soup.find(id=rect_id)
-            if rect:
-                provider_name = id_provider_map[rect_id].title()
-                if provider_name.lower() in vpn_colors:
-                    rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-                    actual_value = provider_data[column_name]
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"{provider_name} - {column_name}: {actual_value:.2f} {measurement_unit}"
-                    rect.append(rect_title)
+    for rect in rects:
+        rect_id = rect['id']
+        
+        if rect_id in id_provider_map:
+            provider_name = id_provider_map[rect_id].title()
+            if provider_name.lower() in vpn_colors:
+                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
+    
     # Add CSS for highlighting bars on hover
     style = """
     <style>
@@ -176,6 +169,36 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     """
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
 
+    return str(soup)
+
+def assign_tooltips(svg_content, measurement_unit, source_data, value_column_mapping):
+    soup = BeautifulSoup(svg_content, 'xml')
+
+    bars_group = soup.find('g', {'class': 'bars'})
+    if bars_group:
+        rects = bars_group.find_all('rect')
+    else:
+        rects = soup.find_all('rect')
+
+    id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
+    
+    # Assign tooltips based on bar heights and corresponding values
+    for provider in extract_providers_from_labels(soup):
+        provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
+        provider_data = source_data.loc[provider]
+
+        # Sort the bars by height and the data by value
+        sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1], reverse=True)
+        sorted_values = sorted(provider_data.items(), key=lambda x: x[1], reverse=True)
+
+        if len(sorted_bars) == len(sorted_values):
+            for (bar_id, _), (column_name, value) in zip(sorted_bars, sorted_values):
+                rect = soup.find(id=bar_id)
+                if rect:
+                    rect_title = soup.new_tag('title')
+                    rect_title.string = f"{provider} - {column_name}: {value:.2f} {measurement_unit}"
+                    rect.append(rect_title)
+    
     return str(soup)
 
 def convert_svg_to_jpg(svg_content, output_path):
@@ -222,6 +245,9 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
 
     # Apply the column mapping to change bar colors
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
+    
+    # Assign tooltips based on values
+    modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
