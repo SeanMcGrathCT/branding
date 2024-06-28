@@ -102,6 +102,7 @@ def generate_column_mapping(unique_labels, source_data):
         value_column_mapping[label] = column
     return value_column_mapping
 
+# Updated function for changing bar colors and assigning tooltips
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
@@ -131,41 +132,32 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     add_gradients_to_svg(soup, vpn_colors)
 
     id_provider_map = map_bars_to_providers(soup, providers)
-    
-    # Embed source data as metadata
-    metadata = soup.new_tag('metadata')
-    metadata.string = source_data.to_json()
-    soup.svg.append(metadata)
 
-    # Add SEO metadata
-    seo_metadata = {
-        "@context": "http://schema.org",
-        "@type": "Dataset",
-        "name": seo_title,
-        "description": seo_description,
-        "data": source_data.to_dict(orient='records')
-    }
-    seo_script = soup.new_tag('script', type='application/ld+json')
-    seo_script.string = json.dumps(seo_metadata)
-    soup.svg.append(seo_script)
+    # Create a mapping of bar heights to values for each provider
+    for provider in providers:
+        provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
+        provider_data = source_data.loc[provider]
 
-    for rect in rects:
-        rect_id = rect['id']
-        
-        if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id].title()
-            if provider_name.lower() in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-                # Adjust tooltip values based on scaling factor
-                normalized_provider_name = provider_name.lower()
-                if normalized_provider_name in source_data.index:
-                    column_name = value_column_mapping.get(normalized_provider_name)
-                    if column_name:
-                        actual_value = source_data.loc[normalized_provider_name, column_name]
-                        rect_title = soup.new_tag('title')
-                        rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
-                        rect.append(rect_title)
-    
+        # Sort the bars by height and the data by value
+        sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1])
+        sorted_values = sorted(provider_data.items(), key=lambda x: x[1])
+
+        # Create a mapping of bar ids to data columns
+        bar_value_mapping = {sorted_bars[i][0]: sorted_values[i][0] for i in range(len(sorted_bars))}
+
+        # Assign colors and tooltips to bars
+        for rect_id, column_name in bar_value_mapping.items():
+            rect = soup.find(id=rect_id)
+            if rect:
+                provider_name = id_provider_map[rect_id].title()
+                if provider_name.lower() in vpn_colors:
+                    rect['fill'] = f'url(#gradient-{provider_name.lower()})'
+                    # Get the actual value from the source data
+                    actual_value = provider_data[column_name]
+                    rect_title = soup.new_tag('title')
+                    rect_title.string = f"{provider_name} - {column_name}: {actual_value:.2f} {measurement_unit}"
+                    rect.append(rect_title)
+
     # Add CSS for highlighting bars on hover
     style = """
     <style>
@@ -222,7 +214,6 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     # Generate column mapping using Streamlit selectbox
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
-    # Apply the column mapping to change bar colors
     # Apply the column mapping to change bar colors
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
