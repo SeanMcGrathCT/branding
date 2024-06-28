@@ -200,7 +200,7 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
                     rect.append(rect_title)
     
     return str(soup)
-
+    
 def convert_svg_to_jpg(svg_content, output_path):
     temp_svg_path = 'temp_modified_viz.svg'
     with open(temp_svg_path, 'w') as file:
