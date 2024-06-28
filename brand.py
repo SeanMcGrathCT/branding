@@ -82,7 +82,7 @@ def map_bars_to_providers(soup, providers):
     
     return id_provider_map
 
-def change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo_description):
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -131,20 +131,16 @@ def change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo
 
     for rect in rects:
         rect_id = rect['id']
-        
         if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id].title()
-            if provider_name.lower() in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
+            provider_name = id_provider_map[rect_id].lower()
+            if provider_name in vpn_colors:
+                rect['fill'] = f'url(#gradient-{provider_name})'
                 # Adjust tooltip values based on scaling factor
-                normalized_provider_name = provider_name.lower()
-                if normalized_provider_name in source_data.index:
-                    column_name = provider_name.lower()
-                    if column_name:
-                        actual_value = source_data.loc[normalized_provider_name, column_name]
-                        rect_title = soup.new_tag('title')
-                        rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
-                        rect.append(rect_title)
+                if provider_name in source_data.index:
+                    actual_value = source_data.loc[provider_name, value_column]
+                    rect_title = soup.new_tag('title')
+                    rect_title.string = f"Value: {actual_value:.2f} {measurement_unit}"
+                    rect.append(rect_title)
     
     # Add CSS for highlighting bars on hover
     style = """
@@ -193,14 +189,14 @@ seo_description = st.text_area("Enter the SEO description for the visualization:
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
-    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
+    source_data = pd.read_csv(uploaded_data, index_col=0)
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
     # Display available columns and let the user select one
     available_columns = list(source_data.columns)
     value_column = st.selectbox("Select the column to use for values:", available_columns)
 
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo_description)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
@@ -239,4 +235,3 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
                 file_name=full_name.replace('.svg', '.jpg'),
                 mime="image/jpeg"
             )
-
