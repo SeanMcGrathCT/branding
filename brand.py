@@ -143,10 +143,10 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
         "@type": "Dataset",
         "name": seo_title,
         "description": seo_description,
-        "data": source_data.to_dict(orient='records')
+        "data": {provider: source_data.loc[provider].to_dict() for provider in source_data.index}
     }
     seo_script = soup.new_tag('script', type='application/ld+json')
-    seo_script.string = json.dumps(seo_metadata)
+    seo_script.string = json.dumps(seo_metadata, indent=4)
     soup.svg.append(seo_script)
 
     for rect in rects:
