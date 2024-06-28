@@ -193,10 +193,17 @@ seo_description = st.text_area("Enter the SEO description for the visualization:
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
-    source_data = pd.read_csv(uploaded_data, index_col=0)
+    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo_description)
+    # Extract unique labels from the SVG
+    unique_labels = extract_unique_labels(svg_content)
+
+    # Generate column mapping using Streamlit selectbox
+    value_column_mapping = generate_column_mapping(unique_labels, source_data)
+
+    # Apply the column mapping to change bar colors
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
@@ -208,7 +215,8 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         # Save modified SVG
         with open(full_name, 'w') as file:
             file.write(modified_svg_content)
-                st.download_button(
+        
+        st.download_button(
             label="Download modified SVG",
             data=modified_svg_content,
             file_name=full_name,
