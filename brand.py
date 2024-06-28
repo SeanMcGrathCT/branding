@@ -1,4 +1,4 @@
-mport streamlit as st
+import streamlit as st
 import pandas as pd
 import cairosvg
 from PIL import Image
@@ -159,7 +159,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
                 # Adjust tooltip values based on scaling factor
                 normalized_provider_name = provider_name.lower()
                 if normalized_provider_name in source_data.index:
-                    column_name = value_column_mapping.get(rect_id)
+                    column_name = value_column_mapping.get(normalized_provider_name)
                     if column_name:
                         actual_value = source_data.loc[normalized_provider_name, column_name]
                         rect_title = soup.new_tag('title')
@@ -222,6 +222,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     # Generate column mapping using Streamlit selectbox
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
+    # Apply the column mapping to change bar colors
     # Apply the column mapping to change bar colors
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
