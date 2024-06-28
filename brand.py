@@ -180,6 +180,7 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(file_path)
     return blob.public_url
+
 # Streamlit UI
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
@@ -195,11 +196,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     source_data = pd.read_csv(uploaded_data, index_col=0)
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
-    # Display available columns and let the user select one
-    available_columns = list(source_data.columns)
-    value_column = st.selectbox("Select the column to use for values:", available_columns)
-
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column, seo_title, seo_description)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, seo_title, seo_description)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
@@ -211,8 +208,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         # Save modified SVG
         with open(full_name, 'w') as file:
             file.write(modified_svg_content)
-        
-        st.download_button(
+                st.download_button(
             label="Download modified SVG",
             data=modified_svg_content,
             file_name=full_name,
