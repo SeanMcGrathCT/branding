@@ -88,7 +88,7 @@ def extract_unique_labels(svg_content):
     
     unique_labels = set()
     for bar in bars:
-        if 'id' in bar.attrs:  # Check if 'id' attribute exists
+        if 'id' in bar.attrs and 'background' not in bar.attrs['id']:  # Exclude background
             original_id = bar['id']
             clean_id = original_id.replace("undefined - ", "").strip()
             unique_labels.add(clean_id)
@@ -191,18 +191,16 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
         sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1], reverse=True)
         sorted_values = sorted(provider_data.items(), key=lambda x: x[1], reverse=True)
 
-        st.write(f"Provider: {provider}")  # Log provider for debugging
-        st.write(f"Sorted Bars: {sorted_bars}")  # Log sorted bars for debugging
-        st.write(f"Sorted Values: {sorted_values}")  # Log sorted values for debugging
+        # Ensure the sorted values match the number of bars
+        sorted_values = sorted_values[:len(sorted_bars)]
 
         if len(sorted_bars) == len(sorted_values):
             for (bar_id, _), (column_name, value) in zip(sorted_bars, sorted_values):
                 rect = soup.find(id=bar_id)
                 if rect:
                     rect_title = soup.new_tag('title')
-                    rect_title.string = f"{provider} - {column_name}: {value:.2f} {measurement_unit}"
+                    rect_title.string = f"{provider.title()} - {column_name}: {value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-                    st.write(f"Assigned tooltip: {rect_title.string}")  # Log tooltip assignment for debugging
     
     return str(soup)
 
