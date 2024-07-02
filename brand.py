@@ -11,7 +11,9 @@ import copy
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
-    firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
+    firebase_credentials = dict(st.secrets["FIREBASE_CREDENTIALS"])
+    # Convert the string private key into the required format
+    firebase_credentials['private_key'] = firebase_credentials['private_key'].replace('\\n', '\n')
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
         'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
