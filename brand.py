@@ -184,22 +184,18 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
         rects = soup.find_all('rect')
 
     id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
-
+    
     for provider in extract_providers_from_labels(soup):
         provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
         provider_data = source_data.loc[provider]
 
-        st.write(f"Provider: {provider}")
-        st.write(f"Provider Data: {provider_data}")
-        st.write(f"Provider Bars: {provider_bars}")
-
-        # Ensure all values are numeric
-        numeric_provider_data = {k: v for k, v in provider_data.items() if isinstance(v, (int, float))}
-        st.write(f"Numeric Provider Data: {numeric_provider_data}")
-
+        # Ensure provider_data is a Series and filter out non-numeric values
+        provider_data = provider_data.apply(pd.to_numeric, errors='coerce').dropna()
+        
         sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1], reverse=True)
-        sorted_values = sorted(numeric_provider_data.items(), key=lambda x: x[1], reverse=True)[:len(sorted_bars)]
+        sorted_values = sorted(provider_data.items(), key=lambda x: x[1], reverse=True)[:len(sorted_bars)]
 
+        st.write(f"Provider: {provider}")
         st.write(f"Sorted Bars: {sorted_bars}")
         st.write(f"Sorted Values: {sorted_values}")
 
@@ -210,9 +206,7 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
                     rect_title = soup.new_tag('title')
                     rect_title.string = f"{provider.title()} - {column_name}: {value:.2f} {measurement_unit}"
                     rect.append(rect_title)
-        else:
-            st.write(f"Warning: Mismatch in the number of bars and values for provider {provider}.")
-
+    
     return str(soup)
 
 def convert_svg_to_jpg(svg_content, output_path):
