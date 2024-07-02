@@ -12,15 +12,10 @@ import copy
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
     firebase_credentials = st.secrets["FIREBASE_CREDENTIALS"]
-    # Create a copy of the credentials to modify
-    firebase_credentials_copy = copy.deepcopy(firebase_credentials)
-    # Convert the string private key into the required format
-    firebase_credentials_copy['private_key'] = firebase_credentials_copy['private_key'].replace('\\n', '\n')
-    cred = credentials.Certificate(firebase_credentials_copy)
+    cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
-        'storageBucket': f"{firebase_credentials_copy['project_id']}.appspot.com"
+        'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
     })
-
 
 # Define VPN colors
 vpn_colors = {
