@@ -137,15 +137,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     
     # Filter source_data to include only the mapped columns
     mapped_columns = set(value_column_mapping.values())
-    st.write(f"Mapped Columns: {mapped_columns}")
-    st.write(f"Source Data Columns: {set(source_data.columns)}")
-
-    # Check if all mapped columns exist in source_data
-    available_columns = mapped_columns.intersection(set(source_data.columns))
-    if not available_columns:
-        st.error("None of the mapped columns exist in the source data.")
-        return svg_content
-
+    available_columns = [col for col in mapped_columns if col in source_data.columns]
     filtered_data = source_data[available_columns].copy()
 
     # Append unit of measurement to each value in filtered data
@@ -192,6 +184,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
 
     return str(soup)
+
 
 def assign_tooltips(svg_content, measurement_unit, source_data, value_column_mapping):
     soup = BeautifulSoup(svg_content, 'xml')
