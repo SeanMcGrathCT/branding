@@ -7,6 +7,7 @@ import firebase_admin
 from firebase_admin import credentials, storage
 import json
 from datetime import datetime
+import copy
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
@@ -88,39 +89,21 @@ def extract_unique_labels(svg_content):
     soup = BeautifulSoup(svg_content, 'xml')
     bars = soup.find_all('rect')
     
-    unique_labels = set()
+    unique_labels = {}
     for bar in bars:
         if 'id' in bar.attrs:  # Check if 'id' attribute exists
             original_id = bar['id']
             clean_id = original_id.replace("undefined - ", "").strip()
-            unique_labels.add(clean_id)
+            label = bar.find_next_sibling('title').string if bar.find_next_sibling('title') else clean_id
+            unique_labels[clean_id] = label
     
-    return list(unique_labels)
+    return unique_labels
 
-def extract_bar_labels(svg_content):
-    soup = BeautifulSoup(svg_content, 'xml')
-    bars_group = soup.find('g', {'class': 'bars'})
-    bar_labels = {}
-    if bars_group:
-        rects = bars_group.find_all('rect')
-    else:
-        rects = soup.find_all('rect')
-
-    id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
-    
-    for rect in rects:
-        rect_id = rect['id']
-        if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id]
-            bar_labels[rect_id] = provider_name
-    
-    return bar_labels
-
-def generate_column_mapping(bar_labels, source_data):
+def generate_column_mapping(unique_labels, source_data):
     value_column_mapping = {}
-    for bar_id, provider_name in bar_labels.items():
-        column = st.selectbox(f"Select the column for {provider_name} ({bar_id}):", list(source_data.columns), key=bar_id)
-        value_column_mapping[bar_id] = column
+    for label, clean_id in unique_labels.items():
+        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
+        value_column_mapping[clean_id] = column
     return value_column_mapping
 
 def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
@@ -238,16 +221,15 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
     
     return str(soup)
 
-def change_label_if_single_provider(svg_content, new_label=None):
+def change_label_if_single_provider(svg_content, custom_label):
     soup = BeautifulSoup(svg_content, 'xml')
     providers = extract_providers_from_labels(soup)
     
-    if len(providers) == 1 and new_label:
-        label_g = soup.find('g', {'class': 'tick'})
-        if label_g:
-            text = label_g.find('text')
-            if text:
-                text.string = new_label
+    if len(providers) == 1:
+        for g in soup.find_all('g', {'class': 'tick'}):
+            text = g.find('text')
+            if text and text.get_text().strip().lower() in vpn_colors:
+                text.string = custom_label
     
     return str(soup)
 
@@ -281,6 +263,7 @@ uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv
 measurement_unit = st.text_input("Enter the unit of measurement:")
 seo_title = st.text_input("Enter the SEO title for the visualization:")
 seo_description = st.text_area("Enter the SEO description for the visualization:")
+custom_label = None
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
@@ -289,10 +272,9 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
 
     # Extract unique labels from the SVG
     unique_labels = extract_unique_labels(svg_content)
-    bar_labels = extract_bar_labels(svg_content)
 
     # Generate column mapping using Streamlit selectbox
-    value_column_mapping = generate_column_mapping(bar_labels, source_data)
+    value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
     # Apply the column mapping to change bar colors
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
@@ -300,11 +282,12 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     # Assign tooltips based on values
     modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
     
-    # Prompt user for custom Y-axis label if there's only one provider
+    # Check if there's only one provider and ask for custom label
     if len(extract_providers_from_labels(BeautifulSoup(modified_svg_content, 'xml'))) == 1:
-        custom_label = st.text_input("Enter the custom label for the Y-axis (optional):")
-        if custom_label:
-            modified_svg_content = change_label_if_single_provider(modified_svg_content, custom_label)
+        custom_label = st.text_input("Enter custom label for the single provider:")
+
+    if custom_label:
+        modified_svg_content = change_label_if_single_provider(modified_svg_content, custom_label)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
