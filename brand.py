@@ -135,6 +135,16 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
 
     id_provider_map = map_bars_to_providers(soup, providers)
     
+    # Filter source_data to include only the mapped columns
+    mapped_columns = set(value_column_mapping.values())
+    filtered_data = source_data[mapped_columns].copy()
+
+    # Append unit of measurement to each value in filtered data
+    for provider in filtered_data.index:
+        for column in filtered_data.columns:
+            if pd.notna(filtered_data.at[provider, column]):
+                filtered_data.at[provider, column] = f"{filtered_data.at[provider, column]} {measurement_unit}"
+
     # Embed source data as metadata
     metadata = soup.new_tag('metadata')
     metadata.string = source_data.to_json()
@@ -146,7 +156,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
         "@type": "Dataset",
         "name": seo_title,
         "description": seo_description,
-        "data": {provider: source_data.loc[provider].to_dict() for provider in source_data.index}
+        "data": {provider: filtered_data.loc[provider].to_dict() for provider in filtered_data.index}
     }
     seo_script = soup.new_tag('script', type='application/ld+json')
     seo_script.string = json.dumps(seo_metadata, indent=4)
