@@ -221,16 +221,20 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
     
     return str(soup)
 
-def change_label_if_single_provider(soup):
+def change_label_if_single_provider(svg_content):
+    soup = BeautifulSoup(svg_content, 'xml')
     providers = extract_providers_from_labels(soup)
+    
     if len(providers) == 1:
-        change_label = st.checkbox("Do you want to change the label for the single provider?")
+        change_label = st.checkbox(f"Do you want to change the label for {providers[0].title()}?")
         if change_label:
-            new_label = st.text_input("Enter the new label for the provider:")
+            new_label = st.text_input(f"Enter the new label for {providers[0].title()}:")
             if new_label:
-                for text in soup.find_all('text'):
+                for g in soup.find_all('g', {'class': 'tick'}):
+                    text = g.find('text')
                     if text.get_text().strip().lower() == providers[0]:
                         text.string = new_label
+    
     return str(soup)
 
 def convert_svg_to_jpg(svg_content, output_path):
@@ -278,11 +282,11 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     # Apply the column mapping to change bar colors
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
-    # Change label if there is only one provider
-    modified_svg_content = change_label_if_single_provider(modified_svg_content)
-
     # Assign tooltips based on values
     modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
+    
+    # Check and change label if there is a single provider
+    modified_svg_content = change_label_if_single_provider(modified_svg_content)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
