@@ -283,8 +283,16 @@ custom_label = None
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description and svg_size:
     svg_content = uploaded_file.read().decode("utf-8")
-    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
-    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
+    source_data = pd.read_csv(uploaded_data)
+    
+    # Check if 'VPN provider' is in columns and normalize the index
+    if 'VPN provider' in source_data.columns:
+        source_data.set_index('VPN provider', inplace=True)
+    else:
+        st.error("CSV file must have a 'VPN provider' column.")
+        st.stop()
+    
+    source_data.index = source_data.index.str.lower().str.strip()  # Normalize index to lowercase and strip spaces
 
     # Extract unique labels from the SVG
     unique_labels = extract_unique_labels(svg_content)
