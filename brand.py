@@ -54,7 +54,7 @@ def adjust_brightness(hex_color, factor):
     hex_color = hex_color.lstrip('#')
     rgb = [int(hex_color[i:i+2], 16) for i in (0, 2, 4)]
     rgb = [int(max(min(c * (1 + factor), 255), 0)) for c in rgb]
-    return f'#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}'
+    return f'#{rgb[0]:02x}{rgb[1]:02x}'
 
 def extract_providers_from_labels(soup):
     providers = []
@@ -106,7 +106,7 @@ def generate_column_mapping(unique_labels, source_data):
         value_column_mapping[clean_id] = column
     return value_column_mapping
 
-def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description, svg_size):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -184,7 +184,22 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     """
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
 
-    return str(soup)
+    # Adjust the SVG size
+    if svg_size == 'small':
+        svg_start = '''<?xml version="1.0" encoding="utf-8"?>
+<div style="max-width: 500px;">
+  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'''
+        svg_end = '</svg></div>'
+    else:
+        svg_start = '''<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'''
+        svg_end = '</svg>'
+
+    svg_content = str(soup)
+    svg_content = svg_content.replace('<?xml version="1.0" encoding="utf-8"?>', '')
+    modified_svg_content = f"{svg_start}{svg_content}{svg_end}"
+    
+    return modified_svg_content
 
 def assign_tooltips(svg_content, measurement_unit, source_data, value_column_mapping):
     soup = BeautifulSoup(svg_content, 'xml')
@@ -263,9 +278,10 @@ uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv
 measurement_unit = st.text_input("Enter the unit of measurement:")
 seo_title = st.text_input("Enter the SEO title for the visualization:")
 seo_description = st.text_area("Enter the SEO description for the visualization:")
+svg_size = st.radio("Choose the SVG size:", ('small', 'full width'))
 custom_label = None
 
-if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
+if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description and svg_size:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
     source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
@@ -277,7 +293,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
     # Apply the column mapping to change bar colors
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description, svg_size)
     
     # Assign tooltips based on values
     modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
