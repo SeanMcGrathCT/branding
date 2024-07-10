@@ -295,7 +295,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     source_data = pd.read_csv(uploaded_data)
     
     # Check if 'VPN provider' is in columns and normalize the index
-    if 'VPN provider' is in source_data.columns:
+    if 'VPN provider' in source_data.columns:
         source_data.set_index('VPN provider', inplace=True)
     else:
         st.error("CSV file must have a 'VPN provider' column.")
