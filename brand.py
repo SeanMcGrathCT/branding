@@ -7,7 +7,6 @@ import firebase_admin
 from firebase_admin import credentials, storage
 import json
 from datetime import datetime
-import copy
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
