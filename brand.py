@@ -54,7 +54,7 @@ def adjust_brightness(hex_color, factor):
     hex_color = hex_color.lstrip('#')
     rgb = [int(hex_color[i:i+2], 16) for i in (0, 2, 4)]
     rgb = [int(max(min(c * (1 + factor), 255), 0)) for c in rgb]
-    return f'#{rgb[0]:02x}{rgb[1]:02x}'
+    return f'#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}'
 
 def extract_providers_from_labels(soup):
     providers = []
@@ -213,7 +213,12 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
     id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
     
     for provider in extract_providers_from_labels(soup):
+        provider = provider.lower().strip()
         provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
+        if provider not in source_data.index:
+            st.warning(f"Provider '{provider}' not found in the source data.")
+            continue
+        
         provider_data = source_data.loc[provider]
 
         # Ensure provider_data is a Series and filter out non-numeric values
