@@ -184,19 +184,14 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
 
     # Adjust the SVG size
-    svg = soup.svg
     if svg_size == 'small':
-        svg['viewBox'] = "0 0 500 300"
-        svg['style'] = "width: 100%; height: auto;"
         svg_start = '''<?xml version="1.0" encoding="utf-8"?>
 <div style="max-width: 500px;">
   <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'''
         svg_end = '</svg></div>'
     else:
-        svg['viewBox'] = "0 0 805 600"
-        svg['style'] = "width: 100%; height: auto;"
         svg_start = '''<?xml version="1.0" encoding="utf-8"?>
-<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'''
+<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'''
         svg_end = '</svg>'
 
     svg_content = str(soup)
