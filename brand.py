@@ -7,6 +7,7 @@ import firebase_admin
 from firebase_admin import credentials, storage
 import json
 from datetime import datetime
+import copy
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
@@ -196,6 +197,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
 
     svg_content = str(soup)
     svg_content = svg_content.replace('<?xml version="1.0" encoding="utf-8"?>', '')
+    svg_content = svg_content.replace('<svg xmlns="http://www.w3.org/2000/svg"', '<svg xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;"')
     modified_svg_content = f"{svg_start}{svg_content}{svg_end}"
     
     return modified_svg_content
@@ -212,12 +214,7 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
     id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
     
     for provider in extract_providers_from_labels(soup):
-        provider = provider.lower().strip()
         provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
-        if provider not in source_data.index:
-            st.warning(f"Provider '{provider}' not found in the source data.")
-            continue
-        
         provider_data = source_data.loc[provider]
 
         # Ensure provider_data is a Series and filter out non-numeric values
@@ -282,21 +279,12 @@ uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv
 measurement_unit = st.text_input("Enter the unit of measurement:")
 seo_title = st.text_input("Enter the SEO title for the visualization:")
 seo_description = st.text_area("Enter the SEO description for the visualization:")
-svg_size = st.radio("Choose the SVG size:", ('small', 'full width'))
 custom_label = None
 
-if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description and svg_size:
+if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
-    source_data = pd.read_csv(uploaded_data)
-    
-    # Check if 'VPN provider' is in columns and normalize the index
-    if 'VPN provider' in source_data.columns:
-        source_data.set_index('VPN provider', inplace=True)
-    else:
-        st.error("CSV file must have a 'VPN provider' column.")
-        st.stop()
-    
-    source_data.index = source_data.index.str.lower().str.strip()  # Normalize index to lowercase and strip spaces
+    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
+    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
     # Extract unique labels from the SVG
     unique_labels = extract_unique_labels(svg_content)
@@ -305,7 +293,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
     # Apply the column mapping to change bar colors
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description, svg_size)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
     # Assign tooltips based on values
     modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
