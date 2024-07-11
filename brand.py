@@ -279,6 +279,7 @@ uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv
 measurement_unit = st.text_input("Enter the unit of measurement:")
 seo_title = st.text_input("Enter the SEO title for the visualization:")
 seo_description = st.text_area("Enter the SEO description for the visualization:")
+svg_size = st.selectbox("Select the SVG size:", ["small", "large"])
 custom_label = None
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
@@ -293,7 +294,7 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
     # Apply the column mapping to change bar colors
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description, svg_size)
     
     # Assign tooltips based on values
     modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
