@@ -213,6 +213,7 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
     id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
     
     for provider in extract_providers_from_labels(soup):
+        provider = provider.strip().lower()
         provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
         provider_data = source_data.loc[provider]
 
@@ -284,7 +285,7 @@ custom_label = None
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
-    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
+    source_data.index = source_data.index.str.lower().str.strip()  # Normalize index to lowercase and strip whitespace
 
     # Extract unique labels from the SVG
     unique_labels = extract_unique_labels(svg_content)
