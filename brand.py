@@ -255,14 +255,14 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     return blob.public_url
 
 def rewrite_svg_header(svg_content):
-    if svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>\n<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">'):
+    if svg_content.startswith('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300">'):
         svg_content = svg_content.replace(
-            '<?xml version="1.0" encoding="utf-8"?>\n<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300">',
             '<?xml version="1.0" encoding="utf-8"?>\n<div style="max-width: 500px;">\n  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'
         )
-    elif svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>\n<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">'):
+    elif svg_content.startswith('<svg xmlns="http://www.w3.org/2000/svg" width="805" height="600">'):
         svg_content = svg_content.replace(
-            '<?xml version="1.0" encoding="utf-8"?>\n<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="805" height="600">',
             '<?xml version="1.0" encoding="utf-8"?>\n<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'
         )
     return svg_content
