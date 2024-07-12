@@ -258,18 +258,23 @@ def rewrite_svg_header(svg_content):
     st.write(f"Original SVG header: {svg_content[:200]}")  # Log the original SVG header (increased length for more context)
     
     # Handle cases with or without XML declaration
-    if svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300">') or svg_content.startswith('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300">'):
+    if svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>'):
+        svg_content = svg_content[len('<?xml version="1.0" encoding="utf-8"?>'):].strip()
+    
+    if svg_content.startswith('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300">'):
         svg_content = svg_content.replace(
             '<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300">',
-            '<?xml version="1.0" encoding="utf-8"?>\n<div style="max-width: 500px;">\n  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'
+            '<div style="max-width: 500px;">\n  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'
         )
         st.write("Header matched for width 500 and height 300.")
-    elif svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="805" height="600">') or svg_content.startswith('<svg xmlns="http://www.w3.org/2000/svg" width="805" height="600">'):
+        svg_content = '<?xml version="1.0" encoding="utf-8"?>\n' + svg_content
+    elif svg_content.startswith('<svg xmlns="http://www.w3.org/2000/svg" width="805" height="600">'):
         svg_content = svg_content.replace(
             '<svg xmlns="http://www.w3.org/2000/svg" width="805" height="600">',
-            '<?xml version="1.0" encoding="utf-8"?>\n<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'
+            '<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'
         )
         st.write("Header matched for width 805 and height 600.")
+        svg_content = '<?xml version="1.0" encoding="utf-8"?>\n' + svg_content
     else:
         st.write("No matching header found.")
     
