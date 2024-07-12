@@ -217,7 +217,7 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
     for provider in extract_providers_from_labels(soup):
         provider = provider.strip().lower()
         st.write(f"Debug: Processing provider {provider}")
-        provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
+        provider_bars = {rect['id']: float(rect['height']) for rect in rects if rect['id'] in id_provider_map and id_provider_map[rect['id']] == provider and 'height' in rect.attrs}
         
         if provider not in source_data.index:
             st.write(f"Debug: Provider {provider} not found in source_data")
