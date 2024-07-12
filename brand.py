@@ -7,7 +7,6 @@ import firebase_admin
 from firebase_admin import credentials, storage
 import json
 from datetime import datetime
-import copy
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
@@ -145,7 +144,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     for provider in filtered_data.index:
         for column in filtered_data.columns:
             if pd.notna(filtered_data.at[provider, column]):
-                filtered_data.at[provider, column] = f"{filtered_data.at[provider, column]} {measurement_unit}"
+                filtered_data.at[provider, column]) = f"{filtered_data.at[provider, column]} {measurement_unit}"
 
     # Embed source data as metadata
     metadata = soup.new_tag('metadata')
@@ -294,19 +293,24 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
     # Apply the column mapping to change bar colors
+    st.write("Debug: Calling change_bar_colors with svg_size =", svg_size)
     modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description, svg_size)
     
     # Assign tooltips based on values
+    st.write("Debug: Calling assign_tooltips")
     modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
     
     # Check if there's only one provider and ask for custom label
+    st.write("Debug: Checking for single provider")
     if len(extract_providers_from_labels(BeautifulSoup(modified_svg_content, 'xml'))) == 1:
         custom_label = st.text_input("Enter custom label for the single provider:")
 
     if custom_label:
+        st.write("Debug: Changing label for single provider")
         modified_svg_content = change_label_if_single_provider(modified_svg_content, custom_label)
     
     # Prompt user for file name and date
+    st.write("Debug: Prompting for file name")
     file_name = st.text_input("Enter the file name:")
     current_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -325,10 +329,12 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         )
         
         # Convert modified SVG to JPG
+        st.write("Debug: Converting SVG to JPG")
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
         
         # Upload to Firebase Storage
+        st.write("Debug: Uploading to Firebase")
         bucket = storage.bucket()
         svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
         jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
