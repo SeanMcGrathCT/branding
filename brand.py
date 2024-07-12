@@ -254,6 +254,33 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     blob.upload_from_filename(file_path)
     return blob.public_url
 
+def rewrite_svg_header(svg_content):
+    st.write(f"Original SVG header: {svg_content[:200]}")  # Log the original SVG header (increased length for more context)
+    
+    # Handle cases with or without XML declaration
+    if svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>'):
+        svg_content = svg_content[len('<?xml version="1.0" encoding="utf-8"?>'):].strip()
+    
+    if svg_content.startswith('<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">'):
+        svg_content = svg_content.replace(
+            '<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">',
+            '<div style="max-width: 500px;">\n  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'
+        )
+        st.write("Header matched for width 500 and height 300.")
+        svg_content = '<?xml version="1.0" encoding="utf-8"?>\n' + svg_content + '\n</div>'
+    elif svg_content.startswith('<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">'):
+        svg_content = svg_content.replace(
+            '<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">',
+            '<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'
+        )
+        st.write("Header matched for width 805 and height 600.")
+        svg_content = '<?xml version="1.0" encoding="utf-8"?>\n' + svg_content
+    else:
+        st.write("No matching header found.")
+    
+    st.write(f"Modified SVG header: {svg_content[:200]}")  # Log the modified SVG header (increased length for more context)
+    return svg_content
+
 # Streamlit UI
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
@@ -288,6 +315,9 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
 
     if custom_label:
         modified_svg_content = change_label_if_single_provider(modified_svg_content, custom_label)
+    
+    # Rewrite SVG header based on the specified rules
+    modified_svg_content = rewrite_svg_header(modified_svg_content)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
