@@ -7,7 +7,7 @@ import firebase_admin
 from firebase_admin import credentials, storage
 import json
 from datetime import datetime
-import re
+import copy
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
@@ -106,7 +106,7 @@ def generate_column_mapping(unique_labels, source_data):
         value_column_mapping[clean_id] = column
     return value_column_mapping
 
-def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description, svg_size):
+def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
     soup = BeautifulSoup(svg_content, 'xml')
 
     # Remove specific text elements
@@ -184,24 +184,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     """
     soup.svg.append(BeautifulSoup(style, 'html.parser'))
 
-    # Adjust the SVG size
-    if svg_size == 'small':
-        svg_start = '''<?xml version="1.0" encoding="utf-8"?>
-<div style="max-width: 500px;">
-  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'''
-        svg_end = '</svg></div>'
-    else:
-        svg_start = '''<?xml version="1.0" encoding="utf-8"?>
-<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'''
-        svg_end = '</svg>'
-
-    svg_content = str(soup)
-    svg_content = svg_content.replace('<?xml version="1.0" encoding="utf-8"?>', '')
-    # Remove existing height and width attributes
-    svg_content = re.sub(r'\s*(height|width)="[^"]*"', '', svg_content)
-    modified_svg_content = f"{svg_start}{svg_content}{svg_end}"
-    
-    return modified_svg_content
+    return str(soup)
 
 def assign_tooltips(svg_content, measurement_unit, source_data, value_column_mapping):
     soup = BeautifulSoup(svg_content, 'xml')
@@ -215,14 +198,7 @@ def assign_tooltips(svg_content, measurement_unit, source_data, value_column_map
     id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
     
     for provider in extract_providers_from_labels(soup):
-        provider = provider.strip().lower()
-        st.write(f"Debug: Processing provider {provider}")
-        provider_bars = {rect['id']: float(rect['height']) for rect in rects if rect['id'] in id_provider_map and id_provider_map[rect['id']] == provider and 'height' in rect.attrs}
-        
-        if provider not in source_data.index:
-            st.write(f"Debug: Provider {provider} not found in source_data")
-            continue
-
+        provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
         provider_data = source_data.loc[provider]
 
         # Ensure provider_data is a Series and filter out non-numeric values
@@ -287,13 +263,12 @@ uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv
 measurement_unit = st.text_input("Enter the unit of measurement:")
 seo_title = st.text_input("Enter the SEO title for the visualization:")
 seo_description = st.text_area("Enter the SEO description for the visualization:")
-svg_size = st.selectbox("Select the SVG size:", ["small", "large"])
 custom_label = None
 
 if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
     svg_content = uploaded_file.read().decode("utf-8")
     source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
-    source_data.index = source_data.index.str.lower().str.strip()  # Normalize index to lowercase and strip whitespace
+    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
 
     # Extract unique labels from the SVG
     unique_labels = extract_unique_labels(svg_content)
@@ -302,24 +277,19 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
     value_column_mapping = generate_column_mapping(unique_labels, source_data)
 
     # Apply the column mapping to change bar colors
-    st.write("Debug: Calling change_bar_colors with svg_size =", svg_size)
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description, svg_size)
+    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
     
     # Assign tooltips based on values
-    st.write("Debug: Calling assign_tooltips")
     modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
     
     # Check if there's only one provider and ask for custom label
-    st.write("Debug: Checking for single provider")
     if len(extract_providers_from_labels(BeautifulSoup(modified_svg_content, 'xml'))) == 1:
         custom_label = st.text_input("Enter custom label for the single provider:")
 
     if custom_label:
-        st.write("Debug: Changing label for single provider")
         modified_svg_content = change_label_if_single_provider(modified_svg_content, custom_label)
     
     # Prompt user for file name and date
-    st.write("Debug: Prompting for file name")
     file_name = st.text_input("Enter the file name:")
     current_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -338,12 +308,10 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
         )
         
         # Convert modified SVG to JPG
-        st.write("Debug: Converting SVG to JPG")
         output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
         st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
         
         # Upload to Firebase Storage
-        st.write("Debug: Uploading to Firebase")
         bucket = storage.bucket()
         svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
         jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
