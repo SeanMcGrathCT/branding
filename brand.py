@@ -196,6 +196,8 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
 
     svg_content = str(soup)
     svg_content = svg_content.replace('<?xml version="1.0" encoding="utf-8"?>', '')
+    # Remove existing height and width attributes
+    svg_content = re.sub(r'\s*(height|width)="[^"]*"', '', svg_content)
     svg_content = svg_content.replace('<svg xmlns="http://www.w3.org/2000/svg"', '<svg xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;"')
     modified_svg_content = f"{svg_start}{svg_content}{svg_end}"
     
