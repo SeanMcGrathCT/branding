@@ -144,7 +144,7 @@ def change_bar_colors(svg_content, measurement_unit, source_data, value_column_m
     for provider in filtered_data.index:
         for column in filtered_data.columns:
             if pd.notna(filtered_data.at[provider, column]):
-                filtered_data.at[provider, column]) = f"{filtered_data.at[provider, column]} {measurement_unit}"
+                filtered_data.at[provider, column] = f"{filtered_data.at[provider, column]} {measurement_unit}"
 
     # Embed source data as metadata
     metadata = soup.new_tag('metadata')
