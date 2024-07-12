@@ -254,6 +254,19 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     blob.upload_from_filename(file_path)
     return blob.public_url
 
+def rewrite_svg_header(svg_content):
+    if svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>\n<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">'):
+        svg_content = svg_content.replace(
+            '<?xml version="1.0" encoding="utf-8"?>\n<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">',
+            '<?xml version="1.0" encoding="utf-8"?>\n<div style="max-width: 500px;">\n  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'
+        )
+    elif svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>\n<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">'):
+        svg_content = svg_content.replace(
+            '<?xml version="1.0" encoding="utf-8"?>\n<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">',
+            '<?xml version="1.0" encoding="utf-8"?>\n<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'
+        )
+    return svg_content
+
 # Streamlit UI
 st.title("Visualization Branding Tool")
 st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
@@ -288,6 +301,9 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
 
     if custom_label:
         modified_svg_content = change_label_if_single_provider(modified_svg_content, custom_label)
+    
+    # Rewrite SVG header based on the specified rules
+    modified_svg_content = rewrite_svg_header(modified_svg_content)
     
     # Prompt user for file name and date
     file_name = st.text_input("Enter the file name:")
