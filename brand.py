@@ -356,3 +356,6 @@ if uploaded_file is not None and uploaded_data is not None and measurement_unit 
                 file_name=full_name.replace('.svg', '.jpg'),
                 mime="image/jpeg"
             )
+
+# Ensure to include logging for each step
+st.write("Log:")
