@@ -65,26 +65,24 @@ if uploaded_file is not None:
         # Extract data for the chart
         labels = source_data[label_column].tolist()
         
+        datasets = []
         if chart_type == "Single Bar Chart":
             values = source_data[mapped_columns[label_column]].tolist()
             colors = [get_color(provider) for provider in labels]
-            background_colors = [f'linear-gradient(180deg, {start} 0%, {end} 100%)' for start, end in colors]
             datasets = [{
                 'label': f'Speed ({measurement_unit})',
                 'data': values,
-                'backgroundColor': background_colors,
+                'backgroundColor': [f'rgba(0,0,0,0)' for _ in colors],
                 'borderWidth': 1
             }]
         else:
-            datasets = []
             for col in mapped_columns.values():
                 values = source_data[col].tolist()
                 colors = [get_color(provider) for provider in labels]
-                background_colors = [f'linear-gradient(180deg, {start} 0%, {end} 100%)' for start, end in colors]
                 datasets.append({
                     'label': f'{col} ({measurement_unit})',
                     'data': values,
-                    'backgroundColor': background_colors,
+                    'backgroundColor': [f'rgba(0,0,0,0)' for _ in colors],
                     'borderWidth': 1
                 })
         
@@ -118,6 +116,18 @@ if uploaded_file is not None:
     <script>
         document.addEventListener('DOMContentLoaded', function() {{
             var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
+            var gradientPlugin = {{
+                id: 'customGradient',
+                beforeDatasetsDraw: function(chart, options, pluginOptions) {{
+                    var ctx = chart.ctx;
+                    chart.data.datasets.forEach((dataset, i) => {{
+                        var gradient = ctx.createLinearGradient(0, 0, 0, chart.height);
+                        gradient.addColorStop(0, '{vpn_colors[labels[0].lower()][0]}');
+                        gradient.addColorStop(1, '{vpn_colors[labels[0].lower()][1]}');
+                        dataset.backgroundColor = gradient;
+                    }});
+                }}
+            }};
             var vpnSpeedChart = new Chart(ctx, {{
                 type: 'bar',
                 data: {{
@@ -127,6 +137,7 @@ if uploaded_file is not None:
                 options: {{
                     responsive: true,
                     plugins: {{
+                        customGradient: {{}},
                         title: {{
                             display: true,
                             text: 'VPN Speed Comparison ({measurement_unit})',
@@ -154,7 +165,8 @@ if uploaded_file is not None:
                             }}
                         }}
                     }}
-                }}
+                }},
+                plugins: [gradientPlugin]
             }});
         }});
     </script>
