@@ -2,25 +2,25 @@ import streamlit as st
 import pandas as pd
 import json
 
-# Define VPN colors with gradients for a modern look
+# Define VPN colors with less transparency for a more defined look
 vpn_colors = {
-    'nordvpn': ('#3e5fff', '#1e3a8a'),
-    'surfshark': ('#1EBFBF', '#0f7978'),
-    'expressvpn': ('#DA3940', '#7a191d'),
-    'ipvanish': ('#70BB44', '#426b2d'),
-    'cyberghost': ('#FFCC00', '#b38600'),
-    'purevpn': ('#8566E7', '#483194'),
-    'protonvpn': ('#6D4AFF', '#3a1c8a'),
-    'privatevpn': ('#9f61b9', '#5b306c'),
-    'pia': ('#6dc862', '#3a6b39'),
-    'hotspot shield': ('#6DC0FA', '#3a72a3'),
-    'strongvpn': ('#EEAA1D', '#9b630f')
+    'nordvpn': 'rgba(62, 95, 255, 0.8)',
+    'surfshark': 'rgba(30, 191, 191, 0.8)',
+    'expressvpn': 'rgba(218, 57, 64, 0.8)',
+    'ipvanish': 'rgba(112, 187, 68, 0.8)',
+    'cyberghost': 'rgba(255, 204, 0, 0.8)',
+    'purevpn': 'rgba(133, 102, 231, 0.8)',
+    'protonvpn': 'rgba(109, 74, 255, 0.8)',
+    'privatevpn': 'rgba(159, 97, 185, 0.8)',
+    'pia': 'rgba(109, 200, 98, 0.8)',
+    'hotspot shield': 'rgba(109, 192, 250, 0.8)',
+    'strongvpn': 'rgba(238, 170, 29, 0.8)'
 }
 
 # Function to assign colors based on provider names
 def get_color(provider_name):
     provider_name = provider_name.lower()
-    return vpn_colors.get(provider_name, ('#4b4b4b', '#2a2a2a'))
+    return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
 
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
@@ -72,7 +72,7 @@ if uploaded_file is not None:
             datasets = [{
                 'label': f'Speed ({measurement_unit})',
                 'data': values,
-                'backgroundColor': [f'rgba(0,0,0,0)' for _ in colors],
+                'backgroundColor': colors,
                 'borderWidth': 1
             }]
         else:
@@ -82,7 +82,7 @@ if uploaded_file is not None:
                 datasets.append({
                     'label': f'{col} ({measurement_unit})',
                     'data': values,
-                    'backgroundColor': [f'rgba(0,0,0,0)' for _ in colors],
+                    'backgroundColor': colors,
                     'borderWidth': 1
                 })
         
@@ -116,18 +116,6 @@ if uploaded_file is not None:
     <script>
         document.addEventListener('DOMContentLoaded', function() {{
             var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
-            var gradientPlugin = {{
-                id: 'customGradient',
-                beforeDatasetsDraw: function(chart, options, pluginOptions) {{
-                    var ctx = chart.ctx;
-                    chart.data.datasets.forEach((dataset, i) => {{
-                        var gradient = ctx.createLinearGradient(0, 0, 0, chart.height);
-                        gradient.addColorStop(0, '{vpn_colors[labels[0].lower()][0]}');
-                        gradient.addColorStop(1, '{vpn_colors[labels[0].lower()][1]}');
-                        dataset.backgroundColor = gradient;
-                    }});
-                }}
-            }};
             var vpnSpeedChart = new Chart(ctx, {{
                 type: 'bar',
                 data: {{
@@ -137,7 +125,6 @@ if uploaded_file is not None:
                 options: {{
                     responsive: true,
                     plugins: {{
-                        customGradient: {{}},
                         title: {{
                             display: true,
                             text: 'VPN Speed Comparison ({measurement_unit})',
@@ -165,8 +152,7 @@ if uploaded_file is not None:
                             }}
                         }}
                     }}
-                }},
-                plugins: [gradientPlugin]
+                }}
             }});
         }});
     </script>
