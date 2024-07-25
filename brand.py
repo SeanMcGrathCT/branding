@@ -86,10 +86,10 @@ if uploaded_file is not None:
                 values = source_data[col].tolist()
                 color = get_color(col)
                 datasets.append({
-                    'label': f'{col} ({measurement_unit})',
+                    'label': col,
                     'data': values,
-                    'backgroundColor': [get_color(provider) for provider in labels],
-                    'borderColor': [get_color(provider) for provider in labels],
+                    'backgroundColor': color,
+                    'borderColor': color,
                     'borderWidth': 1
                 })
         
