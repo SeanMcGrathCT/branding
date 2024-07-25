@@ -2,6 +2,26 @@ import streamlit as st
 import pandas as pd
 import json
 
+# Define VPN colors
+vpn_colors = {
+    'nordvpn': 'rgba(62, 95, 255, 0.6)',
+    'surfshark': 'rgba(30, 191, 191, 0.6)',
+    'expressvpn': 'rgba(218, 57, 64, 0.6)',
+    'ipvanish': 'rgba(112, 187, 68, 0.6)',
+    'cyberghost': 'rgba(255, 204, 0, 0.6)',
+    'purevpn': 'rgba(133, 102, 231, 0.6)',
+    'protonvpn': 'rgba(109, 74, 255, 0.6)',
+    'privatevpn': 'rgba(159, 97, 185, 0.6)',
+    'pia': 'rgba(109, 200, 98, 0.6)',
+    'hotspot shield': 'rgba(109, 192, 250, 0.6)',
+    'strongvpn': 'rgba(238, 170, 29, 0.6)'
+}
+
+# Function to assign colors based on provider names
+def get_color(provider_name):
+    provider_name = provider_name.lower()
+    return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.6)')
+
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
 
@@ -35,31 +55,38 @@ if uploaded_file is not None:
         
         if chart_type == "Single Bar Chart":
             values = source_data[mapped_columns[label_column]].tolist()
+            background_colors = [get_color(provider) for provider in labels]
+            border_colors = [color.replace('0.6', '1') for color in background_colors]
             datasets = [{
                 'label': 'Speed (Mbps)',
                 'data': values,
-                'backgroundColor': 'rgba(75, 192, 192, 0.6)',
-                'borderColor': 'rgba(75, 192, 192, 1)',
+                'backgroundColor': background_colors,
+                'borderColor': border_colors,
                 'borderWidth': 1
             }]
         else:
             datasets = []
-            colors = ['rgba(75, 192, 192, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(153, 102, 255, 0.6)',
-                      'rgba(255, 159, 64, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(255, 206, 86, 0.6)',
-                      'rgba(75, 192, 192, 0.6)', 'rgba(54, 162, 235, 0.6)']
-            border_colors = ['rgba(75, 192, 192, 1)', 'rgba(54, 162, 235, 1)', 'rgba(153, 102, 255, 1)',
-                             'rgba(255, 159, 64, 1)', 'rgba(255, 99, 132, 1)', 'rgba(255, 206, 86, 1)',
-                             'rgba(75, 192, 192, 1)', 'rgba(54, 162, 235, 1)']
-            for idx, (col, color, border_color) in enumerate(zip(mapped_columns.values(), colors, border_colors)):
+            for col in mapped_columns.values():
                 values = source_data[col].tolist()
+                background_colors = [get_color(provider) for provider in labels]
+                border_colors = [color.replace('0.6', '1') for color in background_colors]
                 datasets.append({
                     'label': col,
                     'data': values,
-                    'backgroundColor': color,
-                    'borderColor': border_color,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
                     'borderWidth': 1
                 })
         
+        # Generate ld+json metadata
+        metadata = {
+            "@context": "http://schema.org",
+            "@type": "Dataset",
+            "name": seo_title,
+            "description": seo_description,
+            "data": {provider: source_data.loc[source_data[label_column] == provider].to_dict('records')[0] for provider in labels}
+        }
+
         # Generate the HTML content
         html_content = f"""
 <!DOCTYPE html>
@@ -70,6 +97,9 @@ if uploaded_file is not None:
     <title>{seo_title}</title>
     <meta name="description" content="{seo_description}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script type="application/ld+json">
+    {json.dumps(metadata, indent=4)}
+    </script>
 </head>
 <body>
     <div style="width: 100%; max-width: 800px; margin: 0 auto;">
