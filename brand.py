@@ -76,16 +76,19 @@ if uploaded_file is not None:
                 'borderWidth': 1
             }]
         else:
-            for col in mapped_columns.values():
-                values = source_data[col].tolist()
-                colors = [get_color(provider) for provider in labels]
+            unique_providers = source_data[label_column].unique()
+            for provider in unique_providers:
+                provider_data = source_data[source_data[label_column] == provider]
+                data = [provider_data[col].values[0] for col in mapped_columns.values()]
+                color = get_color(provider)
                 datasets.append({
-                    'label': f'{col} ({measurement_unit})',
-                    'data': values,
-                    'backgroundColor': colors,
-                    'borderColor': colors,
+                    'label': provider,
+                    'data': data,
+                    'backgroundColor': color,
+                    'borderColor': color,
                     'borderWidth': 1
                 })
+            labels = list(mapped_columns.keys())
         
         # Generate ld+json metadata
         metadata = {
@@ -93,7 +96,7 @@ if uploaded_file is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in mapped_columns.values()} for provider in labels}
+            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in mapped_columns.values()} for provider in unique_providers}
         }
 
         # Generate the HTML content
