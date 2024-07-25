@@ -84,12 +84,12 @@ if uploaded_file is not None:
             labels = source_data[label_column].tolist()
             for col in mapped_columns.values():
                 values = source_data[col].tolist()
-                colors = [get_color(provider) for provider in labels]
+                color = get_color(col)
                 datasets.append({
                     'label': f'{col} ({measurement_unit})',
                     'data': values,
-                    'backgroundColor': colors,
-                    'borderColor': colors,
+                    'backgroundColor': [get_color(provider) for provider in labels],
+                    'borderColor': [get_color(provider) for provider in labels],
                     'borderWidth': 1
                 })
         
