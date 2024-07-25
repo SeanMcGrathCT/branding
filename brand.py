@@ -45,6 +45,9 @@ if uploaded_file is not None:
         value_columns = st.multiselect("Select the columns for tests:", source_data.columns)
         mapped_columns = {col: col for col in value_columns}
     
+    # Input measurement unit
+    measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", "Mbps")
+    
     # Input SEO title and description
     seo_title = st.text_input("Enter the SEO title for the chart:")
     seo_description = st.text_area("Enter the SEO description for the chart:")
@@ -54,11 +57,11 @@ if uploaded_file is not None:
         labels = source_data[label_column].tolist()
         
         if chart_type == "Single Bar Chart":
-            values = source_data[mapped_columns[label_column]].tolist()
+            values = [f"{val} {measurement_unit}" for val in source_data[mapped_columns[label_column]].tolist()]
             background_colors = [get_color(provider) for provider in labels]
             border_colors = [color.replace('0.6', '1') for color in background_colors]
             datasets = [{
-                'label': 'Speed (Mbps)',
+                'label': f'Speed ({measurement_unit})',
                 'data': values,
                 'backgroundColor': background_colors,
                 'borderColor': border_colors,
@@ -67,11 +70,11 @@ if uploaded_file is not None:
         else:
             datasets = []
             for col in mapped_columns.values():
-                values = source_data[col].tolist()
+                values = [f"{val} {measurement_unit}" for val in source_data[col].tolist()]
                 background_colors = [get_color(provider) for provider in labels]
                 border_colors = [color.replace('0.6', '1') for color in background_colors]
                 datasets.append({
-                    'label': col,
+                    'label': f'{col} ({measurement_unit})',
                     'data': values,
                     'backgroundColor': background_colors,
                     'borderColor': border_colors,
@@ -84,7 +87,7 @@ if uploaded_file is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: source_data.loc[source_data[label_column] == provider].to_dict('records')[0] for provider in labels}
+            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in mapped_columns.values()} for provider in labels}
         }
 
         # Generate the HTML content
@@ -119,13 +122,20 @@ if uploaded_file is not None:
                     plugins: {{
                         title: {{
                             display: true,
-                            text: 'VPN Speed Comparison (Mbps)',
+                            text: 'VPN Speed Comparison ({measurement_unit})',
                             font: {{
                                 size: 18
                             }}
                         }},
                         legend: {{
                             display: true
+                        }},
+                        tooltip: {{
+                            callbacks: {{
+                                label: function(context) {{
+                                    return context.raw + ' {measurement_unit}';
+                                }}
+                            }}
                         }}
                     }},
                     scales: {{
@@ -133,7 +143,7 @@ if uploaded_file is not None:
                             beginAtZero: true,
                             title: {{
                                 display: true,
-                                text: 'Speed (Mbps)'
+                                text: 'Speed ({measurement_unit})'
                             }}
                         }}
                     }}
