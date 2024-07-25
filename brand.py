@@ -62,6 +62,9 @@ if uploaded_file is not None:
     seo_title = st.text_input("Enter the SEO title for the chart:")
     seo_description = st.text_area("Enter the SEO description for the chart:")
 
+    # Input Y axis label
+    y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
+
     # Select chart size
     chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"])
     if chart_size == "Small":
@@ -132,7 +135,7 @@ if uploaded_file is not None:
                 plugins: {{
                     title: {{
                         display: true,
-                        text: 'VPN Speed Comparison ({measurement_unit})',
+                        text: '{seo_title}',
                         font: {{
                             size: 18
                         }}
@@ -153,7 +156,7 @@ if uploaded_file is not None:
                         beginAtZero: true,
                         title: {{
                             display: true,
-                            text: 'Speed ({measurement_unit})'
+                            text: '{y_axis_label}'
                         }}
                     }}
                 }}
