@@ -41,7 +41,7 @@ if uploaded_file is not None:
         <canvas id="vpnSpeedChart"></canvas>
     </div>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function() {{
             var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
             var vpnSpeedChart = new Chart(ctx, {{
                 type: 'bar',
@@ -80,7 +80,7 @@ if uploaded_file is not None:
                     }}
                 }}
             }});
-        });
+        }});
     </script>
 </body>
 </html>
