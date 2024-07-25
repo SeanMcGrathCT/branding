@@ -112,69 +112,57 @@ if uploaded_file is not None:
             "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in mapped_columns.values()} for provider in source_data[label_column].unique()}
         }
 
-        # Generate the HTML content
+        # Generate the HTML content for insertion
         html_content = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{seo_title}</title>
-    <meta name="description" content="{seo_description}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-    <script type="application/ld+json">
-    {json.dumps(metadata, indent=4)}
-    </script>
-</head>
-<body>
-    <div style="width: 100%; max-width: {chart_width}px; margin: 0 auto;">
-        <canvas id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
-    </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {{
-            var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
-            var vpnSpeedChart = new Chart(ctx, {{
-                type: 'bar',
-                data: {{
-                    labels: {json.dumps(labels)},
-                    datasets: {json.dumps(datasets)}
-                }},
-                options: {{
-                    responsive: true,
-                    plugins: {{
-                        title: {{
-                            display: true,
-                            text: 'VPN Speed Comparison ({measurement_unit})',
-                            font: {{
-                                size: 18
-                            }}
-                        }},
-                        legend: {{
-                            display: true
-                        }},
-                        tooltip: {{
-                            callbacks: {{
-                                label: function(context) {{
-                                    return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
-                                }}
-                            }}
+<div style="width: 100%; max-width: {chart_width}px; margin: 0 auto;">
+    <canvas id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
+        var vpnSpeedChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {json.dumps(labels)},
+                datasets: {json.dumps(datasets)}
+            }},
+            options: {{
+                responsive: true,
+                plugins: {{
+                    title: {{
+                        display: true,
+                        text: 'VPN Speed Comparison ({measurement_unit})',
+                        font: {{
+                            size: 18
                         }}
                     }},
-                    scales: {{
-                        y: {{
-                            beginAtZero: true,
-                            title: {{
-                                display: true,
-                                text: 'Speed ({measurement_unit})'
+                    legend: {{
+                        display: true
+                    }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
                             }}
                         }}
                     }}
+                }},
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        title: {{
+                            display: true,
+                            text: 'Speed ({measurement_unit})'
+                        }}
+                    }}
                 }}
-            }});
+            }}
         }});
-    </script>
-</body>
-</html>
+    }});
+</script>
+<script type="application/ld+json">
+{json.dumps(metadata, indent=4)}
+</script>
 """
         # Display download button for the HTML content
         st.download_button(
