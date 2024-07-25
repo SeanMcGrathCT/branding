@@ -2,25 +2,25 @@ import streamlit as st
 import pandas as pd
 import json
 
-# Define VPN colors
+# Define VPN colors with gradients for a modern look
 vpn_colors = {
-    'nordvpn': 'rgba(62, 95, 255, 0.6)',
-    'surfshark': 'rgba(30, 191, 191, 0.6)',
-    'expressvpn': 'rgba(218, 57, 64, 0.6)',
-    'ipvanish': 'rgba(112, 187, 68, 0.6)',
-    'cyberghost': 'rgba(255, 204, 0, 0.6)',
-    'purevpn': 'rgba(133, 102, 231, 0.6)',
-    'protonvpn': 'rgba(109, 74, 255, 0.6)',
-    'privatevpn': 'rgba(159, 97, 185, 0.6)',
-    'pia': 'rgba(109, 200, 98, 0.6)',
-    'hotspot shield': 'rgba(109, 192, 250, 0.6)',
-    'strongvpn': 'rgba(238, 170, 29, 0.6)'
+    'nordvpn': ('#3e5fff', '#1e3a8a'),
+    'surfshark': ('#1EBFBF', '#0f7978'),
+    'expressvpn': ('#DA3940', '#7a191d'),
+    'ipvanish': ('#70BB44', '#426b2d'),
+    'cyberghost': ('#FFCC00', '#b38600'),
+    'purevpn': ('#8566E7', '#483194'),
+    'protonvpn': ('#6D4AFF', '#3a1c8a'),
+    'privatevpn': ('#9f61b9', '#5b306c'),
+    'pia': ('#6dc862', '#3a6b39'),
+    'hotspot shield': ('#6DC0FA', '#3a72a3'),
+    'strongvpn': ('#EEAA1D', '#9b630f')
 }
 
 # Function to assign colors based on provider names
 def get_color(provider_name):
     provider_name = provider_name.lower()
-    return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.6)')
+    return vpn_colors.get(provider_name, ('#4b4b4b', '#2a2a2a'))
 
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
@@ -51,6 +51,15 @@ if uploaded_file is not None:
     # Input SEO title and description
     seo_title = st.text_input("Enter the SEO title for the chart:")
     seo_description = st.text_area("Enter the SEO description for the chart:")
+
+    # Select chart size
+    chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"])
+    if chart_size == "Small":
+        chart_width = 500
+        chart_height = 300
+    else:
+        chart_width = 805
+        chart_height = 600
     
     if st.button("Generate HTML"):
         # Extract data for the chart
@@ -58,26 +67,24 @@ if uploaded_file is not None:
         
         if chart_type == "Single Bar Chart":
             values = source_data[mapped_columns[label_column]].tolist()
-            background_colors = [get_color(provider) for provider in labels]
-            border_colors = [color.replace('0.6', '1') for color in background_colors]
+            colors = [get_color(provider) for provider in labels]
+            background_colors = [f'linear-gradient(180deg, {start} 0%, {end} 100%)' for start, end in colors]
             datasets = [{
                 'label': f'Speed ({measurement_unit})',
                 'data': values,
                 'backgroundColor': background_colors,
-                'borderColor': border_colors,
                 'borderWidth': 1
             }]
         else:
             datasets = []
             for col in mapped_columns.values():
                 values = source_data[col].tolist()
-                background_colors = [get_color(provider) for provider in labels]
-                border_colors = [color.replace('0.6', '1') for color in background_colors]
+                colors = [get_color(provider) for provider in labels]
+                background_colors = [f'linear-gradient(180deg, {start} 0%, {end} 100%)' for start, end in colors]
                 datasets.append({
                     'label': f'{col} ({measurement_unit})',
                     'data': values,
                     'backgroundColor': background_colors,
-                    'borderColor': border_colors,
                     'borderWidth': 1
                 })
         
@@ -105,8 +112,8 @@ if uploaded_file is not None:
     </script>
 </head>
 <body>
-    <div style="width: 100%; max-width: 800px; margin: 0 auto;">
-        <canvas id="vpnSpeedChart"></canvas>
+    <div style="width: 100%; max-width: {chart_width}px; margin: 0 auto;">
+        <canvas id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', function() {{
