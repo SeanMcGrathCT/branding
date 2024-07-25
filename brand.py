@@ -117,6 +117,7 @@ if uploaded_file is not None:
 <div style="width: 100%; max-width: {chart_width}px; margin: 0 auto;">
     <canvas id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
         var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
