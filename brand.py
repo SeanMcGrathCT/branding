@@ -57,7 +57,7 @@ if uploaded_file is not None:
         labels = source_data[label_column].tolist()
         
         if chart_type == "Single Bar Chart":
-            values = [f"{val} {measurement_unit}" for val in source_data[mapped_columns[label_column]].tolist()]
+            values = source_data[mapped_columns[label_column]].tolist()
             background_colors = [get_color(provider) for provider in labels]
             border_colors = [color.replace('0.6', '1') for color in background_colors]
             datasets = [{
@@ -70,7 +70,7 @@ if uploaded_file is not None:
         else:
             datasets = []
             for col in mapped_columns.values():
-                values = [f"{val} {measurement_unit}" for val in source_data[col].tolist()]
+                values = source_data[col].tolist()
                 background_colors = [get_color(provider) for provider in labels]
                 border_colors = [color.replace('0.6', '1') for color in background_colors]
                 datasets.append({
@@ -133,7 +133,7 @@ if uploaded_file is not None:
                         tooltip: {{
                             callbacks: {{
                                 label: function(context) {{
-                                    return context.raw + ' {measurement_unit}';
+                                    return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
                                 }}
                             }}
                         }}
