@@ -17,8 +17,18 @@ vpn_colors = {
     'strongvpn': 'rgba(238, 170, 29, 0.8)'
 }
 
+# Define nice colors for test types
+nice_colors = [
+    'rgba(255, 99, 132, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(153, 102, 255, 0.8)',
+    'rgba(255, 159, 64, 0.8)'
+]
+
 # Function to assign colors based on provider names
-def get_color(provider_name):
+def get_provider_color(provider_name):
     provider_name = provider_name.lower()
     return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
 
@@ -72,7 +82,7 @@ if uploaded_file is not None:
             for provider in unique_providers:
                 provider_data = source_data[source_data[label_column] == provider]
                 data = [provider_data[col].values[0] for col in mapped_columns.values()]
-                color = get_color(provider)
+                color = get_provider_color(provider)
                 datasets.append({
                     'label': provider,
                     'data': data,
@@ -82,9 +92,9 @@ if uploaded_file is not None:
                 })
         else:  # Group by Test Type
             labels = source_data[label_column].tolist()
-            for col in mapped_columns.values():
+            for i, col in enumerate(mapped_columns.values()):
                 values = source_data[col].tolist()
-                color = get_color(col)
+                color = nice_colors[i % len(nice_colors)]
                 datasets.append({
                     'label': col,
                     'data': values,
