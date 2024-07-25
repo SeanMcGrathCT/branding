@@ -83,6 +83,7 @@ if uploaded_file is not None:
                     'label': f'{col} ({measurement_unit})',
                     'data': values,
                     'backgroundColor': colors,
+                    'borderColor': colors,
                     'borderWidth': 1
                 })
         
