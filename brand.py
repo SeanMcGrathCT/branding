@@ -142,14 +142,14 @@ if uploaded_file is not None:
                         if (dataset.data[index] === null) {{
                             var text = '{empty_bar_text}';
                             var x = bar.x;
-                            var y = bar.y + (chart.chartArea.bottom - bar.y) / 2;
+                            var y = (bar.y + chart.chartArea.bottom) / 2;
                             ctx.save();
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';
                             ctx.fillStyle = 'black';
                             ctx.fillText(text, x, y);
                             ctx.restore();
-                        }}
+                        }
                     }});
                 }});
             }}
