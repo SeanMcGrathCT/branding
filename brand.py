@@ -89,12 +89,19 @@ if uploaded_file is not None:
                     provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else None
                     for col in mapped_columns.values()
                 ]
-                color = get_provider_color(provider)
+                background_colors = [
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
+                    for col in mapped_columns.values()
+                ]
+                border_colors = [
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
+                    for col in mapped_columns.values()
+                ]
                 datasets.append({
                     'label': provider,
                     'data': data,
-                    'backgroundColor': color,
-                    'borderColor': color,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
@@ -104,12 +111,16 @@ if uploaded_file is not None:
                     value if not pd.isna(value) else None
                     for value in source_data[col].tolist()
                 ]
-                color = nice_colors[i % len(nice_colors)]
+                background_colors = [
+                    nice_colors[i % len(nice_colors)] if value is not None else 'rgba(169, 169, 169, 0.8)'
+                    for value in values
+                ]
+                border_colors = background_colors
                 datasets.append({
                     'label': col,
                     'data': values,
-                    'backgroundColor': color,
-                    'borderColor': color,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
                     'borderWidth': 1
                 })
         
@@ -131,29 +142,6 @@ if uploaded_file is not None:
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
         var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
-        
-        var emptyBarTextPlugin = {{
-            id: 'emptyBarText',
-            afterDraw: function(chart) {{
-                var ctx = chart.ctx;
-                chart.data.datasets.forEach(function(dataset, i) {{
-                    var meta = chart.getDatasetMeta(i);
-                    meta.data.forEach(function(bar, index) {{
-                        if (dataset.data[index] === null) {{
-                            var text = '{empty_bar_text}';
-                            var x = bar.x;
-                            var y = (bar.y + chart.chartArea.bottom) / 2;
-                            ctx.save();
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillStyle = 'black';
-                            ctx.fillText(text, x, y);
-                            ctx.restore();
-                        }
-                    }});
-                }});
-            }}
-        }};
         
         var vpnSpeedChart = new Chart(ctx, {{
             type: 'bar',
@@ -194,8 +182,7 @@ if uploaded_file is not None:
                         }}
                     }}
                 }}
-            }},
-            plugins: [emptyBarTextPlugin]
+            }}
         }});
     }});
 </script>
