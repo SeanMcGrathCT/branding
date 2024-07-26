@@ -46,14 +46,9 @@ if uploaded_file is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
     
     # Select the columns for the chart
-    if chart_type == "Single Bar Chart":
-        label_column = st.selectbox("Select the column for VPN providers:", source_data.columns)
-        value_column = st.selectbox("Select the column for speeds:", source_data.columns)
-        mapped_columns = {label_column: value_column}
-    else:
-        label_column = st.selectbox("Select the column for VPN providers:", source_data.columns)
-        value_columns = st.multiselect("Select the columns for tests:", source_data.columns)
-        mapped_columns = {col: col for col in value_columns}
+    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns)
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns)
+    mapped_columns = {col: col for col in value_columns}
     
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", "Mbps")
@@ -76,6 +71,9 @@ if uploaded_file is not None:
     
     # Select grouping method
     grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
+    
+    # Select whether to display the legend
+    display_legend = st.checkbox("Display legend", value=True)
     
     if st.button("Generate HTML"):
         datasets = []
@@ -141,7 +139,7 @@ if uploaded_file is not None:
                         }}
                     }},
                     legend: {{
-                        display: true
+                        display: {str(display_legend).lower()}
                     }},
                     tooltip: {{
                         callbacks: {{
