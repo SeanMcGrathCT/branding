@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
+import random
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -86,7 +87,7 @@ if uploaded_file is not None:
             for provider in unique_providers:
                 provider_data = source_data[source_data[label_column] == provider]
                 data = [
-                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else None
+                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else random.uniform(0.01, 0.1)
                     for col in mapped_columns.values()
                 ]
                 background_colors = [
@@ -108,11 +109,11 @@ if uploaded_file is not None:
             labels = source_data[label_column].tolist()
             for i, col in enumerate(mapped_columns.values()):
                 values = [
-                    value if not pd.isna(value) else None
+                    value if not pd.isna(value) else random.uniform(0.01, 0.1)
                     for value in source_data[col].tolist()
                 ]
                 background_colors = [
-                    nice_colors[i % len(nice_colors)] if value is not None else 'rgba(169, 169, 169, 0.8)'
+                    nice_colors[i % len(nice_colors)] if value > 0.1 else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
                 border_colors = background_colors
@@ -165,7 +166,7 @@ if uploaded_file is not None:
                     tooltip: {{
                         callbacks: {{
                             label: function(context) {{
-                                if (context.raw === null) {{
+                                if (context.raw <= 0.1) {{
                                     return '{empty_bar_text}';
                                 }}
                                 return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
