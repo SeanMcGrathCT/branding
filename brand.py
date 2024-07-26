@@ -131,6 +131,30 @@ if uploaded_file is not None:
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
         var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
+        
+        var emptyBarTextPlugin = {{
+            id: 'emptyBarText',
+            afterDraw: function(chart) {{
+                var ctx = chart.ctx;
+                chart.data.datasets.forEach(function(dataset, i) {{
+                    var meta = chart.getDatasetMeta(i);
+                    meta.data.forEach(function(bar, index) {{
+                        if (dataset.data[index] === null) {{
+                            var text = '{empty_bar_text}';
+                            var x = bar.x;
+                            var y = bar.y + (chart.chartArea.bottom - bar.y) / 2;
+                            ctx.save();
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = 'black';
+                            ctx.fillText(text, x, y);
+                            ctx.restore();
+                        }}
+                    }});
+                }});
+            }}
+        }};
+        
         var vpnSpeedChart = new Chart(ctx, {{
             type: 'bar',
             data: {{
@@ -168,19 +192,10 @@ if uploaded_file is not None:
                             display: true,
                             text: '{y_axis_label}'
                         }}
-                    }},
-                    x: {{
-                        ticks: {{
-                            callback: function(value, index, values) {{
-                                if (this.getLabelForValue(value) === '{empty_bar_text}') {{
-                                    return '';
-                                }}
-                                return this.getLabelForValue(value);
-                            }}
-                        }}
                     }}
                 }}
-            }}
+            }},
+            plugins: [emptyBarTextPlugin]
         }});
     }});
 </script>
