@@ -60,6 +60,9 @@ if uploaded_file is not None:
     # Input Y axis label
     y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
 
+    # Input text for empty bars
+    empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", "No data available")
+
     # Select chart size
     chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"])
     if chart_size == "Small":
@@ -82,7 +85,10 @@ if uploaded_file is not None:
             unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
                 provider_data = source_data[source_data[label_column] == provider]
-                data = [provider_data[col].values[0] for col in mapped_columns.values()]
+                data = [
+                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else None
+                    for col in mapped_columns.values()
+                ]
                 color = get_provider_color(provider)
                 datasets.append({
                     'label': provider,
@@ -94,7 +100,10 @@ if uploaded_file is not None:
         else:  # Group by Test Type
             labels = source_data[label_column].tolist()
             for i, col in enumerate(mapped_columns.values()):
-                values = source_data[col].tolist()
+                values = [
+                    value if not pd.isna(value) else None
+                    for value in source_data[col].tolist()
+                ]
                 color = nice_colors[i % len(nice_colors)]
                 datasets.append({
                     'label': col,
@@ -115,8 +124,8 @@ if uploaded_file is not None:
 
         # Generate the HTML content for insertion
         html_content = f"""
-<div style="width: 100%; max-width: {chart_width}px; margin: 0 auto;">
-    <canvas id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
+<div style="max-width: {chart_width}px; margin: 0 auto;">
+    <canvas class="jschartgraphic" id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 <script>
@@ -144,6 +153,9 @@ if uploaded_file is not None:
                     tooltip: {{
                         callbacks: {{
                             label: function(context) {{
+                                if (context.raw === null) {{
+                                    return '{empty_bar_text}';
+                                }}
                                 return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
                             }}
                         }}
@@ -155,6 +167,16 @@ if uploaded_file is not None:
                         title: {{
                             display: true,
                             text: '{y_axis_label}'
+                        }}
+                    }},
+                    x: {{
+                        ticks: {{
+                            callback: function(value, index, values) {{
+                                if (this.getLabelForValue(value) === '{empty_bar_text}') {{
+                                    return '';
+                                }}
+                                return this.getLabelForValue(value);
+                            }}
                         }}
                     }}
                 }}
