@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import json
-import random
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -81,23 +80,21 @@ if uploaded_file is not None:
     
     if st.button("Generate HTML"):
         datasets = []
+        null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(mapped_columns.keys())
             unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
                 provider_data = source_data[source_data[label_column] == provider]
                 data = [
-                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else random.uniform(0.01, 0.1)
+                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else null_value
                     for col in mapped_columns.values()
                 ]
                 background_colors = [
                     get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
                     for col in mapped_columns.values()
                 ]
-                border_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
-                    for col in mapped_columns.values()
-                ]
+                border_colors = background_colors
                 datasets.append({
                     'label': provider,
                     'data': data,
@@ -109,14 +106,17 @@ if uploaded_file is not None:
             labels = source_data[label_column].tolist()
             for i, col in enumerate(mapped_columns.values()):
                 values = [
-                    value if not pd.isna(value) else random.uniform(0.01, 0.1)
+                    value if not pd.isna(value) else null_value
                     for value in source_data[col].tolist()
                 ]
                 background_colors = [
-                    nice_colors[i % len(nice_colors)] if value > 0.1 else 'rgba(169, 169, 169, 0.8)'
+                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
-                border_colors = background_colors
+                border_colors = [
+                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    for value in values
+                ]
                 datasets.append({
                     'label': col,
                     'data': values,
@@ -166,7 +166,7 @@ if uploaded_file is not None:
                     tooltip: {{
                         callbacks: {{
                             label: function(context) {{
-                                if (context.raw <= 0.1) {{
+                                if (context.raw <= {null_value * 1.1}) {{
                                     return '{empty_bar_text}';
                                 }}
                                 return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
