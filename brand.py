@@ -60,23 +60,19 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
 def load_chart_data_from_html(html_content):
     try:
         # Locate the start and end of the JSON data within the script
-        start_marker = 'data: {'
-        end_marker = 'options: {'
+        start_marker = '<script type="application/ld+json">'
+        end_marker = '</script>'
         
         start = html_content.find(start_marker)
-        end = html_content.find(end_marker)
+        end = html_content.find(end_marker, start)
 
         if start == -1 or end == -1:
-            raise ValueError("Could not find the data section in the provided HTML content.")
+            raise ValueError("Could not find the JSON data section in the provided HTML content.")
         
         # Extract and clean the JSON data
-        data_json = html_content[start+len(start_marker):end].strip().rstrip(',')
-        data_json = '{' + data_json + '}'
-
-        # Correct the JSON format
-        data_json = data_json.replace('datasets:', '"datasets":').replace('labels:', '"labels":')
+        json_data = html_content[start+len(start_marker):end].strip()
         
-        data = json.loads(data_json)
+        data = json.loads(json_data)
         return data
     except json.JSONDecodeError as e:
         st.error(f"Failed to parse JSON data from HTML content: {e}")
@@ -115,14 +111,10 @@ elif action == "Update Existing Chart":
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            labels = chart_data["labels"]
-            datasets = chart_data["datasets"]
-            seo_title = chart_data.get("seo_title", "")
-            seo_description = chart_data.get("seo_description", "")
-            measurement_unit = chart_data.get("measurement_unit", "Mbps")
-            y_axis_label = chart_data.get("y_axis_label", "Speed (Mbps)")
-            empty_bar_text = chart_data.get("empty_bar_text", "No data available")
-            display_legend = chart_data.get("display_legend", True)
+            labels = list(chart_data["data"].values())[0].keys()
+            datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
+            seo_title = chart_data.get("name", "")
+            seo_description = chart_data.get("description", "")
             # Reconstruct the source_data dataframe from the datasets
             label_column = "Provider"
             data_dict = {label_column: labels}
