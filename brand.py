@@ -281,7 +281,7 @@ if source_data is not None:
 
         # Log the upload to Google Sheets
         google_credentials = service_account.Credentials.from_service_account_info(
-            st.secrets["GCP_SERVICE_ACCOUNT"]
+            json.loads(st.secrets["GCP_SERVICE_ACCOUNT"])
         )
         service = build('sheets', 'v4', credentials=google_credentials)
         sheet = service.spreadsheets()
