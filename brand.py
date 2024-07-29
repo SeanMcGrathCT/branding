@@ -44,7 +44,7 @@ st.title("VPN Speed Comparison Chart Generator")
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
-    firebase_credentials = json.loads(st.secrets["FIREBASE_CREDENTIALS"])
+    firebase_credentials = dict(st.secrets["FIREBASE_CREDENTIALS"])
     # Convert the string private key into the required format
     firebase_credentials['private_key'] = firebase_credentials['private_key'].replace('\\n', '\n')
     cred = credentials.Certificate(firebase_credentials)
@@ -281,7 +281,7 @@ if source_data is not None:
 
         # Log the upload to Google Sheets
         google_credentials = service_account.Credentials.from_service_account_info(
-            json.loads(st.secrets["GCP_SERVICE_ACCOUNT"])
+            dict(st.secrets["GCP_SERVICE_ACCOUNT"])
         )
         service = build('sheets', 'v4', credentials=google_credentials)
         sheet = service.spreadsheets()
