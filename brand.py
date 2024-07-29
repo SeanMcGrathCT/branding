@@ -1,13 +1,47 @@
 import streamlit as st
 import pandas as pd
-import cairosvg
-from PIL import Image
-from bs4 import BeautifulSoup
+import json
+import os
 import firebase_admin
 from firebase_admin import credentials, storage
-import json
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 from datetime import datetime
-import copy
+import uuid
+import requests
+
+# Define VPN colors with less transparency for a more defined look
+vpn_colors = {
+    'nordvpn': 'rgba(62, 95, 255, 0.8)',
+    'surfshark': 'rgba(30, 191, 191, 0.8)',
+    'expressvpn': 'rgba(218, 57, 64, 0.8)',
+    'ipvanish': 'rgba(112, 187, 68, 0.8)',
+    'cyberghost': 'rgba(255, 204, 0, 0.8)',
+    'purevpn': 'rgba(133, 102, 231, 0.8)',
+    'protonvpn': 'rgba(109, 74, 255, 0.8)',
+    'privatevpn': 'rgba(159, 97, 185, 0.8)',
+    'pia': 'rgba(109, 200, 98, 0.8)',
+    'hotspot shield': 'rgba(109, 192, 250, 0.8)',
+    'strongvpn': 'rgba(238, 170, 29, 0.8)'
+}
+
+# Define nice colors for test types
+nice_colors = [
+    'rgba(255, 99, 132, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(153, 102, 255, 0.8)',
+    'rgba(255, 159, 64, 0.8)'
+]
+
+# Function to assign colors based on provider names
+def get_provider_color(provider_name):
+    provider_name = provider_name.lower()
+    return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+
+# Streamlit UI
+st.title("VPN Speed Comparison Chart Generator")
 
 # Initialize Firebase Admin SDK
 if not firebase_admin._apps:
@@ -19,343 +53,267 @@ if not firebase_admin._apps:
         'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
     })
 
-# Define VPN colors
-vpn_colors = {
-    'nordvpn': '#3e5fff',
-    'surfshark': '#1EBFBF',
-    'expressvpn': '#DA3940',
-    'ipvanish': '#70BB44',
-    'cyberghost': '#FFCC00',
-    'purevpn': '#8566E7',
-    'pure vpn': '#8566E7',
-    'protonvpn': '#6D4AFF',
-    'proton vpn': '#6D4AFF',
-    'privatevpn': '#9f61b9',
-    'private vpn': '#9f61b9',
-    'pia': '#6dc862',
-    'private internet access': '#6dc862',
-    'hotspot shield': '#6DC0FA',
-    'strongvpn': '#EEAA1D',
-    'strong vpn': '#EEAA1D'
-}
-
-def add_gradients_to_svg(soup, gradients):
-    defs = soup.new_tag('defs')
-    for vpn_name, color in gradients.items():
-        gradient = soup.new_tag('linearGradient', id=f'gradient-{vpn_name}', x1="0%", y1="0%", x2="0%", y2="100%")
-        stop1 = soup.new_tag('stop', offset="0%", style=f'stop-color:{color};stop-opacity:1')
-        stop2 = soup.new_tag('stop', offset="100%", style=f'stop-color:{adjust_brightness(color, -0.5)};stop-opacity:1')
-        gradient.append(stop1)
-        gradient.append(stop2)
-        defs.append(gradient)
-    soup.svg.insert(0, defs)
-
-def adjust_brightness(hex_color, factor):
-    hex_color = hex_color.lstrip('#')
-    rgb = [int(hex_color[i:i+2], 16) for i in (0, 2, 4)]
-    rgb = [int(max(min(c * (1 + factor), 255), 0)) for c in rgb]
-    return f'#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}'
-
-def extract_providers_from_labels(soup):
-    providers = []
-    for g in soup.find_all('g', {'class': 'tick'}):
-        text = g.find('text').get_text().strip().lower()
-        if text in vpn_colors:
-            providers.append(text)
-    return providers
-
-def map_bars_to_providers(soup, providers):
-    id_provider_map = {}
-    ticks = soup.find_all('g', {'class': 'tick'})
-    
-    # Extract positions of the labels
-    label_positions = [float(tick['transform'].split('(')[1].split(',')[0]) for tick in ticks if tick.find('text').get_text().strip().lower() in vpn_colors]
-    provider_label_map = {pos: providers[i] for i, pos in enumerate(label_positions)}
-    
-    # Map each bar to the closest label based on x position
-    bars = soup.find_all('rect')
-    for i, bar in enumerate(bars):
-        if 'x' in bar.attrs:
-            bar_x = float(bar['x'])
-            closest_label_position = min(label_positions, key=lambda pos: abs(pos - bar_x))
-            provider = provider_label_map[closest_label_position]
-            bar_id = f'bar-{i}'  # Create a unique id based on the index
-            bar['id'] = bar_id
-            id_provider_map[bar_id] = provider
-    
-    return id_provider_map
-
-def extract_unique_labels(svg_content):
-    soup = BeautifulSoup(svg_content, 'xml')
-    bars = soup.find_all('rect')
-    
-    unique_labels = {}
-    for bar in bars:
-        if 'id' in bar.attrs:  # Check if 'id' attribute exists
-            original_id = bar['id']
-            clean_id = original_id.replace("undefined - ", "").strip()
-            label = bar.find_next_sibling('title').string if bar.find_next_sibling('title') else clean_id
-            unique_labels[clean_id] = label
-    
-    return unique_labels
-
-def generate_column_mapping(unique_labels, source_data):
-    value_column_mapping = {}
-    for label, clean_id in unique_labels.items():
-        column = st.selectbox(f"Select the column for {label}:", list(source_data.columns), key=label)
-        value_column_mapping[clean_id] = column
-    return value_column_mapping
-
-def change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description):
-    soup = BeautifulSoup(svg_content, 'xml')
-
-    # Remove specific text elements
-    for text in soup.find_all('text'):
-        if 'Value' in text.get_text() or 'Sets' in text.get_text():
-            text.decompose()
-
-    # Remove x and y labels
-    for text in soup.find_all('text'):
-        if text.get('x') == '4' or text.get('y') == '-4':
-            text.decompose()
-
-    background = soup.find('rect', {'id': 'background'})
-    if background:
-        background['fill'] = '#FFFFFF'
-
-    bars_group = soup.find('g', {'class': 'bars'})
-    if bars_group:
-        rects = bars_group.find_all('rect')
-    else:
-        rects = soup.find_all('rect')
-
-    providers = extract_providers_from_labels(soup)
-    provider_map = {provider: i for i, provider in enumerate(providers)}
-
-    add_gradients_to_svg(soup, vpn_colors)
-
-    id_provider_map = map_bars_to_providers(soup, providers)
-    
-    # Filter source_data to include only the mapped columns
-    mapped_columns = set(value_column_mapping.values())
-    available_columns = [col for col in mapped_columns if col in source_data.columns]
-    filtered_data = source_data[available_columns].copy()
-
-    # Append unit of measurement to each value in filtered data
-    for provider in filtered_data.index:
-        for column in filtered_data.columns:
-            if pd.notna(filtered_data.at[provider, column]):
-                filtered_data.at[provider, column] = f"{filtered_data.at[provider, column]} {measurement_unit}"
-
-    # Embed source data as metadata
-    metadata = soup.new_tag('metadata')
-    metadata.string = source_data.to_json()
-    soup.svg.append(metadata)
-
-    # Add SEO metadata
-    seo_metadata = {
-        "@context": "http://schema.org",
-        "@type": "Dataset",
-        "name": seo_title,
-        "description": seo_description,
-        "data": {provider: filtered_data.loc[provider].to_dict() for provider in filtered_data.index}
-    }
-    seo_script = soup.new_tag('script', type='application/ld+json')
-    seo_script.string = json.dumps(seo_metadata, indent=4)
-    soup.svg.append(seo_script)
-
-    for rect in rects:
-        rect_id = rect['id']
-        
-        if rect_id in id_provider_map:
-            provider_name = id_provider_map[rect_id].title()
-            if provider_name.lower() in vpn_colors:
-                rect['fill'] = f'url(#gradient-{provider_name.lower()})'
-    
-    # Add CSS for highlighting bars on hover
-    style = """
-    <style>
-    rect:hover {
-        stroke: #000000;
-        stroke-width: 2;
-        filter: brightness(1.2);
-    }
-    </style>
-    """
-    soup.svg.append(BeautifulSoup(style, 'html.parser'))
-
-    return str(soup)
-
-def assign_tooltips(svg_content, measurement_unit, source_data, value_column_mapping):
-    soup = BeautifulSoup(svg_content, 'xml')
-
-    bars_group = soup.find('g', {'class': 'bars'})
-    if bars_group:
-        rects = bars_group.find_all('rect')
-    else:
-        rects = soup.find_all('rect')
-
-    id_provider_map = map_bars_to_providers(soup, extract_providers_from_labels(soup))
-    
-    for provider in extract_providers_from_labels(soup):
-        provider_bars = {rect['id']: float(rect['height']) for rect in rects if id_provider_map[rect['id']] == provider}
-        provider_data = source_data.loc[provider]
-
-        # Ensure provider_data is a Series and filter out non-numeric values
-        provider_data = provider_data.apply(pd.to_numeric, errors='coerce').dropna()
-        
-        sorted_bars = sorted(provider_bars.items(), key=lambda x: x[1], reverse=True)
-        sorted_values = sorted(provider_data.items(), key=lambda x: x[1], reverse=True)[:len(sorted_bars)]
-
-        st.write(f"Provider: {provider}")
-        st.write(f"Sorted Bars: {sorted_bars}")
-        st.write(f"Sorted Values: {sorted_values}")
-
-        if len(sorted_bars) == len(sorted_values):
-            for (bar_id, _), (column_name, value) in zip(sorted_bars, sorted_values):
-                rect = soup.find(id=bar_id)
-                if rect:
-                    rect_title = soup.new_tag('title')
-                    rect_title.string = f"{provider.title()} - {column_name}: {value:.2f} {measurement_unit}"
-                    rect.append(rect_title)
-    
-    return str(soup)
-
-def change_label_if_single_provider(svg_content, custom_label):
-    soup = BeautifulSoup(svg_content, 'xml')
-    providers = extract_providers_from_labels(soup)
-    
-    if len(providers) == 1:
-        for g in soup.find_all('g', {'class': 'tick'}):
-            text = g.find('text')
-            if text and text.get_text().strip().lower() in vpn_colors:
-                text.string = custom_label
-    
-    return str(soup)
-
-def convert_svg_to_jpg(svg_content, output_path):
-    temp_svg_path = 'temp_modified_viz.svg'
-    with open(temp_svg_path, 'w') as file:
-        file.write(svg_content)
-
-    temp_png_path = 'temp_modified_viz.png'
-    cairosvg.svg2png(url=temp_svg_path, write_to=temp_png_path)
-
-    output_jpg_path = output_path.replace('.svg', '.jpg')
-    with Image.open(temp_png_path) as img:
-        img = img.convert('RGB')
-        img.save(output_jpg_path, 'JPEG')
-
-    return output_jpg_path
-
 def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     """Uploads a file to the bucket."""
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(file_path)
     return blob.public_url
 
-def rewrite_svg_header(svg_content):
-    st.write(f"Original SVG header: {svg_content[:200]}")  # Log the original SVG header (increased length for more context)
-    
-    # Handle cases with or without XML declaration
-    if svg_content.startswith('<?xml version="1.0" encoding="utf-8"?>'):
-        svg_content = svg_content[len('<?xml version="1.0" encoding="utf-8"?>'):].strip()
-    
-    if svg_content.startswith('<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">'):
-        svg_content = svg_content.replace(
-            '<svg height="300" width="500" xmlns="http://www.w3.org/2000/svg">',
-            '<div style="max-width: 500px;">\n  <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">'
-        )
-        st.write("Header matched for width 500 and height 300.")
-        svg_content = '<?xml version="1.0" encoding="utf-8"?>\n' + svg_content + '\n</div>'
-    elif svg_content.startswith('<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">'):
-        svg_content = svg_content.replace(
-            '<svg height="600" width="805" xmlns="http://www.w3.org/2000/svg">',
-            '<svg viewBox="0 0 805 600" xmlns="http://www.w3.org/2000/svg">'
-        )
-        st.write("Header matched for width 805 and height 600.")
-        svg_content = '<?xml version="1.0" encoding="utf-8"?>\n' + svg_content
+def load_chart_data_from_html(html_url):
+    response = requests.get(html_url)
+    if response.status_code == 200:
+        html_content = response.text
+        start = html_content.find('data: ') + len('data: ')
+        end = html_content.find('options: {') - 1
+        data_json = html_content[start:end].strip()
+        data = json.loads(data_json)
+        return data
     else:
-        st.write("No matching header found.")
-    
-    st.write(f"Modified SVG header: {svg_content[:200]}")  # Log the modified SVG header (increased length for more context)
-    return svg_content
+        st.error("Failed to load chart data from the given URL.")
+        return None
 
-# Streamlit UI
-st.title("Visualization Branding Tool")
-st.write("Upload an SVG file to modify its bar colors based on VPN providers.")
+# Radio button for creating or updating chart
+action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"])
 
-uploaded_file = st.file_uploader("Choose an SVG file", type="svg")
-uploaded_data = st.file_uploader("Choose a CSV file with source data", type="csv")
-measurement_unit = st.text_input("Enter the unit of measurement:")
-seo_title = st.text_input("Enter the SEO title for the visualization:")
-seo_description = st.text_area("Enter the SEO description for the visualization:")
-custom_label = None
+# Initialize variables for form fields
+seo_title = ""
+seo_description = ""
+label_column = ""
+value_columns = []
+measurement_unit = "Mbps"
+y_axis_label = "Speed (Mbps)"
+empty_bar_text = "No data available"
+chart_size = "Full Width"
+chart_width = 805
+chart_height = 600
+grouping_method = "Provider"
+display_legend = True
+source_data = None
 
-if uploaded_file is not None and uploaded_data is not None and measurement_unit and seo_title and seo_description:
-    svg_content = uploaded_file.read().decode("utf-8")
-    source_data = pd.read_csv(uploaded_data, index_col='VPN provider')
-    source_data.index = source_data.index.str.lower()  # Normalize index to lowercase
+if action == "Create New Chart":
+    # Upload CSV file
+    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv")
+    if uploaded_file is not None:
+        source_data = pd.read_csv(uploaded_file)
+        st.write("Data Preview:")
+        st.dataframe(source_data)
+elif action == "Update Existing Chart":
+    chart_url = st.text_input("Enter the URL of the existing chart:")
+    if chart_url:
+        chart_data = load_chart_data_from_html(chart_url)
+        if chart_data:
+            labels = chart_data["labels"]
+            datasets = chart_data["datasets"]
+            seo_title = chart_data.get("seo_title", "")
+            seo_description = chart_data.get("seo_description", "")
+            measurement_unit = chart_data.get("measurement_unit", "Mbps")
+            y_axis_label = chart_data.get("y_axis_label", "Speed (Mbps)")
+            empty_bar_text = chart_data.get("empty_bar_text", "No data available")
+            display_legend = chart_data.get("display_legend", True)
+            # Reconstruct the source_data dataframe from the datasets
+            label_column = "Provider"
+            data_dict = {label_column: labels}
+            for dataset in datasets:
+                data_dict[dataset["label"]] = dataset["data"]
+            source_data = pd.DataFrame(data_dict)
+            st.write("Data Preview:")
+            st.dataframe(source_data)
 
-    # Extract unique labels from the SVG
-    unique_labels = extract_unique_labels(svg_content)
+if source_data is not None:
+    # Select the type of chart
+    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
-    # Generate column mapping using Streamlit selectbox
-    value_column_mapping = generate_column_mapping(unique_labels, source_data)
+    # Select the columns for the chart
+    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns)
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns)
+    mapped_columns = {col: col for col in value_columns}
 
-    # Apply the column mapping to change bar colors
-    modified_svg_content = change_bar_colors(svg_content, measurement_unit, source_data, value_column_mapping, seo_title, seo_description)
-    
-    # Assign tooltips based on values
-    modified_svg_content = assign_tooltips(modified_svg_content, measurement_unit, source_data, value_column_mapping)
-    
-    # Check if there's only one provider and ask for custom label
-    if len(extract_providers_from_labels(BeautifulSoup(modified_svg_content, 'xml'))) == 1:
-        custom_label = st.text_input("Enter custom label for the single provider:")
+    # Input measurement unit
+    measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
 
-    if custom_label:
-        modified_svg_content = change_label_if_single_provider(modified_svg_content, custom_label)
-    
-    # Rewrite SVG header based on the specified rules
-    modified_svg_content = rewrite_svg_header(modified_svg_content)
-    
-    # Prompt user for file name and date
-    file_name = st.text_input("Enter the file name:")
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    # Input SEO title and description
+    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
+    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
 
-    if file_name:
-        full_name = f"{file_name}_{current_date}.svg"
+    # Input Y axis label
+    y_axis_label = st.text_input("Enter the Y axis label:", y_axis_label)
+
+    # Input text for empty bars
+    empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text)
+
+    # Select chart size
+    chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"])
+    if chart_size == "Small":
+        chart_width = 500
+        chart_height = 300
+    else:
+        chart_width = 805
+        chart_height = 600
+
+    # Select grouping method
+    grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
+
+    # Select whether to display the legend
+    display_legend = st.checkbox("Display legend", value=display_legend)
+
+    if st.button("Generate HTML"):
+        datasets = []
+        null_value = 0.05  # Small fixed value for null entries
+        if grouping_method == "Provider":
+            labels = list(mapped_columns.keys())
+            unique_providers = source_data[label_column].unique()
+            for provider in unique_providers:
+                provider_data = source_data[source_data[label_column] == provider]
+                data = [
+                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else null_value
+                    for col in mapped_columns.values()
+                ]
+                background_colors = [
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
+                    for col in mapped_columns.values()
+                ]
+                border_colors = background_colors
+                datasets.append({
+                    'label': provider,
+                    'data': data,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
+                    'borderWidth': 1
+                })
+        else:  # Group by Test Type
+            labels = source_data[label_column].tolist()
+            for i, col in enumerate(mapped_columns.values()):
+                values = [
+                    value if not pd.isna(value) else null_value
+                    for value in source_data[col].tolist()
+                ]
+                background_colors = [
+                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    for value in values
+                ]
+                border_colors = [
+                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    for value in values
+                ]
+                datasets.append({
+                    'label': col,
+                    'data': values,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
+                    'borderWidth': 1
+                })
+
+        # Generate ld+json metadata
+        metadata = {
+            "@context": "http://schema.org",
+            "@type": "Dataset",
+            "name": seo_title,
+            "description": seo_description,
+            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in mapped_columns.values()} for provider in source_data[label_column].unique()}
+        }
+
+        # Generate the HTML content for insertion
+        unique_id = str(uuid.uuid4())
+        html_content = f"""
+<div id="{unique_id}" style="max-width: {chart_width}px; margin: 0 auto;">
+    <canvas class="jschartgraphic" id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
         
-        # Save modified SVG
-        with open(full_name, 'w') as file:
-            file.write(modified_svg_content)
-        
-        st.download_button(
-            label="Download modified SVG",
-            data=modified_svg_content,
-            file_name=full_name,
-            mime="image/svg+xml"
-        )
-        
-        # Convert modified SVG to JPG
-        output_jpg_path = convert_svg_to_jpg(modified_svg_content, full_name)
-        st.image(output_jpg_path, caption="Modified VPN Speed Test Visualization", use_column_width=True)
-        
-        # Upload to Firebase Storage
+        var vpnSpeedChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {json.dumps(labels)},
+                datasets: {json.dumps(datasets)}
+            }},
+            options: {{
+                responsive: true,
+                plugins: {{
+                    title: {{
+                        display: true,
+                        text: '{seo_title}',
+                        font: {{
+                            size: 18
+                        }}
+                    }},
+                    legend: {{
+                        display: {str(display_legend).lower()}
+                    }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                if (context.raw <= {null_value * 1.1}) {{
+                                    return '{empty_bar_text}';
+                                }}
+                                return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
+                            }}
+                        }}
+                    }}
+                }},
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        title: {{
+                            display: true,
+                            text: '{y_axis_label}'
+                        }}
+                    }}
+                }}
+            }}
+        }});
+    }});
+</script>
+<script type="application/ld+json">
+{json.dumps(metadata, indent=4)}
+</script>
+"""
+
+        # Save the HTML content to a file
+        html_file_path = f"{unique_id}.html"
+        with open(html_file_path, "w") as html_file:
+            html_file.write(html_content)
+
+        # Upload the file to Firebase Storage
         bucket = storage.bucket()
-        svg_url = upload_to_firebase_storage(full_name, bucket, full_name)
-        jpg_url = upload_to_firebase_storage(output_jpg_path, bucket, output_jpg_path)
+        public_url = upload_to_firebase_storage(html_file_path, bucket, f"charts/{unique_id}.html")
 
-        st.write(f"SVG uploaded to: {svg_url}")
-        st.write(f"JPG uploaded to: {jpg_url}")
+        # Log the upload to Google Sheets
+        google_credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["GCP_SERVICE_ACCOUNT"]
+        )
+        service = build('sheets', 'v4', credentials=google_credentials)
+        sheet = service.spreadsheets()
 
-        with open(output_jpg_path, "rb") as img_file:
-            st.download_button(
-                label="Download modified JPG",
-                data=img_file,
-                file_name=full_name.replace('.svg', '.jpg'),
-                mime="image/jpeg"
-            )
+        # Prepare the data to be logged
+        log_data = [
+            unique_id,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            seo_title,
+            seo_description,
+            public_url
+        ]
+
+        # Append the data to the Google Sheets
+        sheet.values().append(
+            spreadsheetId="1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q",
+            range="charts!A:E",
+            valueInputOption="USER_ENTERED",
+            body={"values": [log_data]}
+        ).execute()
+
+        # Display download button for the HTML content
+        st.download_button(
+            label="Download HTML",
+            data=html_content,
+            file_name="vpn_speed_comparison.html",
+            mime="text/html"
+        )
+
+        # Provide the public URL of the uploaded chart
+        st.write(f"Chart has been uploaded to Firebase. [View Chart]({public_url})")
 
 # Ensure to include logging for each step
 st.write("Log:")
