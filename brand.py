@@ -59,15 +59,30 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
 
 def load_chart_data_from_html(html_content):
     try:
-        start = html_content.find('data: ') + len('data: ')
-        end = html_content.find('options: {') - 1
-        data_json = html_content[start:end].strip()
-        if data_json.endswith(','):
-            data_json = data_json[:-1]
+        # Locate the start and end of the JSON data within the script
+        start_marker = 'data: {'
+        end_marker = 'options: {'
+        
+        start = html_content.find(start_marker)
+        end = html_content.find(end_marker)
+
+        if start == -1 or end == -1:
+            raise ValueError("Could not find the data section in the provided HTML content.")
+        
+        # Extract and clean the JSON data
+        data_json = html_content[start+len(start_marker):end].strip().rstrip(',')
+        data_json = '{' + data_json + '}'
+
+        # Correct the JSON format
+        data_json = data_json.replace('datasets:', '"datasets":').replace('labels:', '"labels":')
+        
         data = json.loads(data_json)
         return data
     except json.JSONDecodeError as e:
         st.error(f"Failed to parse JSON data from HTML content: {e}")
+        return None
+    except ValueError as e:
+        st.error(e)
         return None
 
 # Radio button for creating or updating chart
