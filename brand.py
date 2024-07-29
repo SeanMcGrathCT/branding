@@ -58,11 +58,17 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     return blob.public_url
 
 def load_chart_data_from_html(html_content):
-    start = html_content.find('data: ') + len('data: ')
-    end = html_content.find('options: {') - 1
-    data_json = html_content[start:end].strip()
-    data = json.loads(data_json)
-    return data
+    try:
+        start = html_content.find('data: ') + len('data: ')
+        end = html_content.find('options: {') - 1
+        data_json = html_content[start:end].strip()
+        if data_json.endswith(','):
+            data_json = data_json[:-1]
+        data = json.loads(data_json)
+        return data
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to parse JSON data from HTML content: {e}")
+        return None
 
 # Radio button for creating or updating chart
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"])
@@ -291,7 +297,7 @@ if source_data is not None:
         # Append the data to the Google Sheets
         sheet.values().append(
             spreadsheetId="1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q",
-            range="charts!A1:E1",  # Correct range format
+            range="charts!A:E",
             valueInputOption="USER_ENTERED",
             body={"values": [log_data]}
         ).execute()
