@@ -7,7 +7,6 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
 import uuid
-import requests
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -58,18 +57,12 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     blob.upload_from_filename(file_path)
     return blob.public_url
 
-def load_chart_data_from_html(html_url):
-    response = requests.get(html_url)
-    if response.status_code == 200:
-        html_content = response.text
-        start = html_content.find('data: ') + len('data: ')
-        end = html_content.find('options: {') - 1
-        data_json = html_content[start:end].strip()
-        data = json.loads(data_json)
-        return data
-    else:
-        st.error("Failed to load chart data from the given URL.")
-        return None
+def load_chart_data_from_html(html_content):
+    start = html_content.find('data: ') + len('data: ')
+    end = html_content.find('options: {') - 1
+    data_json = html_content[start:end].strip()
+    data = json.loads(data_json)
+    return data
 
 # Radio button for creating or updating chart
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"])
@@ -97,9 +90,9 @@ if action == "Create New Chart":
         st.write("Data Preview:")
         st.dataframe(source_data)
 elif action == "Update Existing Chart":
-    chart_url = st.text_input("Enter the URL of the existing chart:")
-    if chart_url:
-        chart_data = load_chart_data_from_html(chart_url)
+    chart_html = st.text_area("Paste the HTML content of the existing chart:")
+    if chart_html:
+        chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
             labels = chart_data["labels"]
             datasets = chart_data["datasets"]
@@ -298,7 +291,7 @@ if source_data is not None:
         # Append the data to the Google Sheets
         sheet.values().append(
             spreadsheetId="1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q",
-            range="charts!A:E",
+            range="charts!A1:E1",  # Correct range format
             valueInputOption="USER_ENTERED",
             body={"values": [log_data]}
         ).execute()
