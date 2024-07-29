@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import json
-import os
 import firebase_admin
 from firebase_admin import credentials, storage
 from google.oauth2 import service_account
@@ -50,7 +49,7 @@ if not firebase_admin._apps:
     firebase_credentials['private_key'] = firebase_credentials['private_key'].replace('\\n', '\n')
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred, {
-        'storageBucket': f"{firebase_credentials['project_id']}.appspot.com"
+        'storageBucket': 'svg-storage.appspot.com'
     })
 
 def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
