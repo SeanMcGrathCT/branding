@@ -120,11 +120,7 @@ elif action == "Update Existing Chart":
             empty_bar_text = "No data available"
             display_legend = True
             grouping_method = "Provider"
-            if "Average" in labels[0]:
-                grouping_method = "Test Type"
-            chart_size = "Full Width"
-            chart_width = 805
-            chart_height = 600
+            
             # Reconstruct the source_data dataframe from the datasets
             label_column = "VPN provider"
             data_dict = {label_column: labels}
@@ -133,6 +129,11 @@ elif action == "Update Existing Chart":
             source_data = pd.DataFrame(data_dict).transpose()
             source_data.columns = source_data.iloc[0]
             source_data = source_data.drop(source_data.index[0])
+            
+            # Check if grouping method should be by Test Type
+            if any("Average" in label for label in source_data.columns):
+                grouping_method = "Test Type"
+                
             st.write("Data Preview:")
             source_data = st.experimental_data_editor(source_data)
 
