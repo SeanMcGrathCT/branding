@@ -129,19 +129,15 @@ elif action == "Update Existing Chart":
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
+            source_data = pd.DataFrame(data_dict).transpose()
+            source_data.columns = source_data.iloc[0]
+            source_data = source_data.drop(source_data.index[0])
+            source_data.reset_index(inplace=True)
+            source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
             st.write("Data Preview:")
-            source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
             source_data = st.data_editor(source_data)
 
 if source_data is not None:
-    # Transpose the data so providers are in column A and tests are horizontal in row 1
-    source_data = source_data.transpose()
-    source_data.columns = source_data.iloc[0]
-    source_data = source_data.drop(source_data.index[0])
-    source_data.index.name = "VPN provider"
-    source_data.reset_index(inplace=True)
-    
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
@@ -234,7 +230,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]}" for col in value_columns} for provider in source_data[label_column]}
+            "data": {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]}" for col in value_columns} for provider in source_data[label_column]}
         }
 
         # Generate the HTML content for insertion
