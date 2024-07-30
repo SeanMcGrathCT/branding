@@ -208,8 +208,12 @@ if source_data is not None:
                 provider_data = source_data[source_data[label_column] == provider]
                 try:
                     st.write(f"Provider: {provider}, Data: {provider_data}")
-                    x_val = provider_data[x_column].values[0][0]  # Extract first element from list
-                    y_val = provider_data[y_column].values[0][0]  # Extract first element from list
+                    x_val = provider_data[x_column].values[0]
+                    y_val = provider_data[y_column].values[0]
+                    if isinstance(x_val, list):
+                        x_val = x_val[0]
+                    if isinstance(y_val, list):
+                        y_val = y_val[0]
                     st.write(f"x_val: {x_val}, y_val: {y_val}")  # Debugging
                     x_val = float(str(x_val))
                     y_val = float(str(y_val))
