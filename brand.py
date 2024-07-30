@@ -116,7 +116,7 @@ elif action == "Update Existing Chart":
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             # Reconstruct the source_data dataframe from the datasets
-            label_column = "VPN provider"  # Update the header to "VPN provider"
+            label_column = "VPN provider"
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
@@ -129,8 +129,8 @@ if source_data is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
     # Select the columns for the chart
-    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns)
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns)
+    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, index=0)
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns[1:])
     mapped_columns = {col: col for col in value_columns}
 
     # Input measurement unit
@@ -214,7 +214,12 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]}" for col in mapped_columns.values()} for provider in source_data[label_column].unique()}
+            "data": {
+                provider: {
+                    col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]}"
+                    for col in mapped_columns.values()
+                } for provider in source_data[label_column].unique()
+            }
         }
 
         # Generate the HTML content for insertion
