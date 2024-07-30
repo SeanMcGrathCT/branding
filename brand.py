@@ -82,7 +82,7 @@ def load_chart_data_from_html(html_content):
         return None
 
 # Radio button for creating or updating chart
-action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_radio')
+action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_choice')
 
 # Initialize variables for form fields
 seo_title = ""
@@ -101,13 +101,13 @@ source_data = None
 
 if action == "Create New Chart":
     # Upload CSV file
-    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv", key='upload_csv')
+    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv")
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data = st.data_editor(source_data)
+        source_data = st.experimental_data_editor(source_data)
 elif action == "Update Existing Chart":
-    chart_html = st.text_area("Paste the HTML content of the existing chart:", key='paste_html')
+    chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
@@ -115,43 +115,50 @@ elif action == "Update Existing Chart":
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
-            y_axis_label = "Speed (Mbps)"  # Assuming this value for now
-            measurement_unit = "Mbps"  # Assuming this value for now
-            chart_size = "Full Width"  # Assuming this value for now
-            grouping_method = "Provider"  # Assuming this value for now
-            display_legend = True  # Assuming this value for now
+            measurement_unit = "Mbps"  # Assuming the unit is always Mbps
+            y_axis_label = "Speed (Mbps)"
+            empty_bar_text = "No data available"
+            display_legend = True
+            grouping_method = "Provider"
+            if "Average" in labels[0]:
+                grouping_method = "Test Type"
+            chart_size = "Full Width"
+            chart_width = 805
+            chart_height = 600
             # Reconstruct the source_data dataframe from the datasets
             label_column = "VPN provider"
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
             source_data = pd.DataFrame(data_dict).transpose()
+            source_data.columns = source_data.iloc[0]
+            source_data = source_data.drop(source_data.index[0])
             st.write("Data Preview:")
-            source_data = st.data_editor(source_data)
+            source_data = st.experimental_data_editor(source_data)
 
 if source_data is not None:
     # Select the type of chart
-    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"], key='chart_type')
+    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
     # Select the columns for the chart
     label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns, key='value_columns')
 
     # Input measurement unit
-    measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit, key='measurement_unit')
+    measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
 
     # Input SEO title and description
-    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title, key='seo_title')
-    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description, key='seo_description')
+    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
+    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
 
     # Input Y axis label
-    y_axis_label = st.text_input("Enter the Y axis label:", y_axis_label, key='y_axis_label')
+    y_axis_label = st.text_input("Enter the Y axis label:", y_axis_label)
 
     # Input text for empty bars
-    empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text, key='empty_bar_text')
+    empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text)
 
     # Select chart size
-    chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"], key='chart_size')
+    chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"])
     if chart_size == "Small":
         chart_width = 500
         chart_height = 300
@@ -160,17 +167,17 @@ if source_data is not None:
         chart_height = 600
 
     # Select grouping method
-    grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"], key='grouping_method')
+    grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
 
     # Select whether to display the legend
-    display_legend = st.checkbox("Display legend", value=display_legend, key='display_legend')
+    display_legend = st.checkbox("Display legend", value=display_legend)
 
-    if st.button("Generate HTML", key='generate_html'):
+    if st.button("Generate HTML"):
         datasets = []
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data.index
+            unique_providers = source_data.index.unique()
             for provider in unique_providers:
                 provider_data = source_data.loc[provider]
                 data = [
@@ -218,7 +225,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.loc[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
