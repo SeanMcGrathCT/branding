@@ -141,7 +141,10 @@ if source_data is not None:
     # Select the columns for the chart
     if not source_data.empty:
         label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-        value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns[1:], key='value_columns')
+        # Ensure the default value columns are valid columns in the dataframe
+        valid_columns = list(source_data.columns)
+        default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
+        value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -196,7 +199,7 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data[label_column].tolist()
+            labels = source_data.index.tolist()
             for i, col in enumerate(value_columns):
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
@@ -224,7 +227,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data[label_column]}
+            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
