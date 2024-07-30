@@ -105,6 +105,7 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
+        source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
         source_data = st.data_editor(source_data)
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
@@ -128,10 +129,9 @@ elif action == "Update Existing Chart":
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict).transpose()
-            source_data.columns = source_data.iloc[0]
-            source_data = source_data.drop(source_data.index[0])
+            source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
+            source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
             source_data = st.data_editor(source_data)
 
 if source_data is not None:
@@ -175,9 +175,9 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data.index.unique()
+            unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
-                provider_data = source_data.loc[provider]
+                provider_data = source_data[source_data[label_column] == provider]
                 data = [
                     float(provider_data[col].split(' ')[0]) if not pd.isna(provider_data[col]) else null_value
                     for col in value_columns
@@ -195,7 +195,7 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data.columns.tolist()
+            labels = source_data[label_column].tolist()
             for i, col in enumerate(value_columns):
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
@@ -205,7 +205,10 @@ if source_data is not None:
                     nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
-                border_colors = background_colors
+                border_colors = [
+                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    for value in values
+                ]
                 datasets.append({
                     'label': col,
                     'data': values,
@@ -220,7 +223,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data[label_column]}
         }
 
         # Generate the HTML content for insertion
