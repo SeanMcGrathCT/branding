@@ -7,6 +7,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
 import uuid
+import requests
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -59,13 +60,12 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
 
 def load_chart_data_from_html(html_content):
     try:
-        start = html_content.find('data: {') + len('data: {')
+        start = html_content.find('data: {') + len('data: ')
         end = html_content.find('options: {') - 1
         data_json = html_content[start:end].strip()
-        data_json = '{' + data_json.rsplit('}', 1)[0] + '}'
         data = json.loads(data_json)
         return data
-    except Exception as e:
+    except json.JSONDecodeError as e:
         st.error(f"Failed to parse JSON data from HTML content: {e}")
         return None
 
@@ -95,9 +95,9 @@ if action == "Create New Chart":
         st.write("Data Preview:")
         st.dataframe(source_data)
 elif action == "Update Existing Chart":
-    html_code = st.text_area("Paste the HTML code of the existing chart:")
-    if html_code:
-        chart_data = load_chart_data_from_html(html_code)
+    html_content = st.text_area("Paste the HTML content of the existing chart:")
+    if html_content:
+        chart_data = load_chart_data_from_html(html_content)
         if chart_data:
             labels = chart_data["labels"]
             datasets = chart_data["datasets"]
@@ -108,24 +108,29 @@ elif action == "Update Existing Chart":
             empty_bar_text = chart_data.get("empty_bar_text", "No data available")
             display_legend = chart_data.get("display_legend", True)
             # Reconstruct the source_data dataframe from the datasets
-            label_column = "VPN provider"
+            label_column = "Provider"
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame.from_dict(data_dict)
+            source_data = pd.DataFrame(data_dict)
+            source_data = source_data.transpose()
             st.write("Data Preview:")
-            st.dataframe(source_data)
+            source_data = st.experimental_data_editor(source_data)
 
 if source_data is not None:
-    # Ensure correct orientation of data
-    if 'VPN provider' in source_data.columns:
-        source_data = source_data.set_index('VPN provider').transpose()
-
-    # Allow editing of the source data
-    edited_data = st.experimental_data_editor(source_data)
+    # Transpose the data if needed to match the original layout
+    if 'VPN provider' not in source_data.columns:
+        source_data = source_data.transpose()
+        source_data.columns = source_data.iloc[0]
+        source_data = source_data[1:]
 
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
+
+    # Select the columns for the chart
+    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns)
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns)
+    mapped_columns = {col: col for col in value_columns}
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -159,17 +164,17 @@ if source_data is not None:
         datasets = []
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
-            labels = list(edited_data.columns)
-            unique_providers = edited_data.index
+            labels = list(mapped_columns.keys())
+            unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
-                provider_data = edited_data.loc[provider]
+                provider_data = source_data[source_data[label_column] == provider]
                 data = [
-                    provider_data[col] if not pd.isna(provider_data[col]) else null_value
-                    for col in edited_data.columns
+                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else null_value
+                    for col in mapped_columns.values()
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
-                    for col in edited_data.columns
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
+                    for col in mapped_columns.values()
                 ]
                 border_colors = background_colors
                 datasets.append({
@@ -180,11 +185,11 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = edited_data.index.tolist()
-            for i, col in enumerate(edited_data.columns):
+            labels = source_data[label_column].tolist()
+            for i, col in enumerate(mapped_columns.values()):
                 values = [
                     value if not pd.isna(value) else null_value
-                    for value in edited_data[col].tolist()
+                    for value in source_data[col].tolist()
                 ]
                 background_colors = [
                     nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
@@ -208,7 +213,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{edited_data.at[provider, col]} {measurement_unit}" for col in edited_data.columns} for provider in edited_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in mapped_columns.values()} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
