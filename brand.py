@@ -126,19 +126,19 @@ elif action == "Update Existing Chart":
             chart_height = 600
             
             # Determine chart type based on data structure
-            if datasets and isinstance(datasets[0]["data"], list) and datasets[0]["data"]:
+            if datasets and isinstance(datasets[0]["data"], dict):
                 first_dataset = datasets[0]["data"]
-                if isinstance(first_dataset[0], dict) and 'x' in first_dataset[0] and 'y' in first_dataset[0]:
+                if 'x' in first_dataset and 'y' in first_dataset:
                     chart_type = "Scatter Chart"
                     label_column = "VPN provider"
-                    x_column = list(first_dataset[0].keys())[0]
-                    y_column = list(first_dataset[0].keys())[1]
+                    x_column = list(first_dataset.keys())[0]
+                    y_column = list(first_dataset.keys())[1]
                     data_dict = {label_column: [], x_column: [], y_column: []}
                     for dataset in datasets:
-                        for point in dataset["data"]:
+                        for x, y in zip(dataset["data"][x_column], dataset["data"][y_column]):
                             data_dict[label_column].append(dataset["label"])
-                            data_dict[x_column].append(point['x'])
-                            data_dict[y_column].append(point['y'])
+                            data_dict[x_column].append(x)
+                            data_dict[y_column].append(y)
                     source_data = pd.DataFrame(data_dict)
                 else:
                     chart_type = "Grouped Bar Chart"
