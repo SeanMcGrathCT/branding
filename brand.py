@@ -186,8 +186,8 @@ if source_data is not None:
             y_values = []
             for provider in source_data[label_column].unique():
                 provider_data = source_data[source_data[label_column] == provider]
-                x_val = provider_data[x_column].values[0]
-                y_val = provider_data[y_column].values[0]
+                x_val = float(provider_data[x_column].values[0])
+                y_val = float(provider_data[y_column].values[0])
                 x_values.append(x_val)
                 y_values.append(y_val)
                 scatter_data = [{'x': x_val, 'y': y_val}]
@@ -273,7 +273,7 @@ if source_data is not None:
             type: '{'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
             data: {{
                 labels: {json.dumps(labels)},
-                datasets: {json.dumps(datasets)}
+                datasets: {json.dumps(datasets, default=str)}
             }},
             options: {{
                 responsive: true,
