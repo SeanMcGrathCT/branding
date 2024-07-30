@@ -130,9 +130,11 @@ elif action == "Update Existing Chart":
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict).transpose()
+            source_data = pd.DataFrame(data_dict)
+            source_data = source_data.T.reset_index().T  # Fix header row
             source_data.columns = source_data.iloc[0]
             source_data = source_data.drop(source_data.index[0])
+            source_data = source_data.reset_index(drop=True)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
@@ -177,9 +179,9 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data.index.unique()
+            unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
-                provider_data = source_data.loc[provider]
+                provider_data = source_data[source_data[label_column] == provider]
                 data = [
                     float(provider_data[col].split(' ')[0]) if not pd.isna(provider_data[col]) else null_value
                     for col in value_columns
@@ -197,7 +199,7 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data.index.tolist()
+            labels = source_data[label_column].tolist()
             for i, col in enumerate(value_columns):
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
