@@ -201,7 +201,7 @@ if source_data is not None:
         chart_width = 805
         chart_height = 600
 
-    # Select whether to display the legend
+    # Display legend
     display_legend = st.checkbox("Display legend", value=display_legend)
 
     if st.button("Generate HTML"):
