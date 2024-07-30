@@ -81,6 +81,16 @@ def load_chart_data_from_html(html_content):
         st.error(e)
         return None
 
+def construct_dataframe_from_chart_data(chart_data):
+    data_dict = {}
+    for provider, tests in chart_data["data"].items():
+        for test, value in tests.items():
+            value = float(value.split()[0])
+            if test not in data_dict:
+                data_dict[test] = {}
+            data_dict[test][provider] = value
+    return pd.DataFrame(data_dict).transpose()
+
 # Radio button for creating or updating chart
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"])
 
@@ -111,16 +121,9 @@ elif action == "Update Existing Chart":
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            labels = list(chart_data["data"].values())[0].keys()
-            datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
-            # Reconstruct the source_data dataframe from the datasets
-            label_column = "Provider"
-            data_dict = {label_column: labels}
-            for dataset in datasets:
-                data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
+            source_data = construct_dataframe_from_chart_data(chart_data)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
@@ -166,15 +169,15 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(mapped_columns.keys())
-            unique_providers = source_data[label_column].unique()
+            unique_providers = source_data.index.unique()
             for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
+                provider_data = source_data.loc[provider]
                 data = [
-                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else null_value
+                    provider_data[col] if not pd.isna(provider_data[col]) else null_value
                     for col in mapped_columns.values()
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
                     for col in mapped_columns.values()
                 ]
                 border_colors = background_colors
@@ -186,7 +189,7 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data[label_column].tolist()
+            labels = source_data.columns.tolist()
             for i, col in enumerate(mapped_columns.values()):
                 values = [
                     value if not pd.isna(value) else null_value
@@ -214,7 +217,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in mapped_columns.values()} for provider in source_data[label_column].unique()}
+            "data": {provider: {col: f"{source_data.loc[provider, col]} {measurement_unit}" for col in mapped_columns.values()} for provider in source_data.index.unique()}
         }
 
         # Generate the HTML content for insertion
