@@ -14,7 +14,7 @@ vpn_colors = {
     'surfshark': 'rgba(30, 191, 191, 0.8)',
     'expressvpn': 'rgba(218, 57, 64, 0.8)',
     'ipvanish': 'rgba(112, 187, 68, 0.8)',
-    'cyberghost': 'rgba(255, 204, 0, 0.8)',
+    'cyberghost': 'rgba(255, 204, 0.8)',
     'purevpn': 'rgba(133, 102, 231, 0.8)',
     'protonvpn': 'rgba(109, 74, 255, 0.8)',
     'privatevpn': 'rgba(159, 97, 185, 0.8)',
@@ -147,11 +147,11 @@ if source_data is not None:
         # Ensure the default value columns are valid columns in the dataframe
         valid_columns = list(source_data.columns)
         default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
-        if chart_type != "Scatter Chart":
-            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
-        else:
+        if chart_type == "Scatter Chart":
             x_column = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
             y_column = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
+        else:
+            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
