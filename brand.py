@@ -97,6 +97,7 @@ chart_height = 600
 grouping_method = "Provider"
 display_legend = True
 source_data = None
+chart_type = "Single Bar Chart"  # Default value
 
 if action == "Create New Chart":
     # Upload CSV file
@@ -123,31 +124,32 @@ elif action == "Update Existing Chart":
             chart_height = 600
             
             # Determine chart type based on data structure
-            first_dataset = datasets[0]["data"]
-            if isinstance(first_dataset[0], dict) and 'x' in first_dataset[0] and 'y' in first_dataset[0]:
-                chart_type = "Scatter Chart"
-                label_column = "VPN provider"
-                x_column = list(first_dataset[0].keys())[0]
-                y_column = list(first_dataset[0].keys())[1]
-                data_dict = {label_column: [], x_column: [], y_column: []}
-                for dataset in datasets:
-                    for point in dataset["data"]:
-                        data_dict[label_column].append(dataset["label"])
-                        data_dict[x_column].append(point['x'])
-                        data_dict[y_column].append(point['y'])
-                source_data = pd.DataFrame(data_dict)
-            else:
-                chart_type = "Grouped Bar Chart"
-                label_column = "VPN provider"
-                value_columns = list(first_dataset.keys())
-                data_dict = {label_column: list(first_dataset.keys())}
-                for dataset in datasets:
-                    data_dict[dataset["label"]] = list(dataset["data"].values())
-                source_data = pd.DataFrame(data_dict).transpose()
-                source_data.columns = source_data.iloc[0]
-                source_data = source_data.drop(source_data.index[0])
-                source_data.reset_index(inplace=True)
-                source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
+            if datasets and isinstance(datasets[0]["data"], list) and datasets[0]["data"]:
+                first_dataset = datasets[0]["data"]
+                if isinstance(first_dataset[0], dict) and 'x' in first_dataset[0] and 'y' in first_dataset[0]:
+                    chart_type = "Scatter Chart"
+                    label_column = "VPN provider"
+                    x_column = list(first_dataset[0].keys())[0]
+                    y_column = list(first_dataset[0].keys())[1]
+                    data_dict = {label_column: [], x_column: [], y_column: []}
+                    for dataset in datasets:
+                        for point in dataset["data"]:
+                            data_dict[label_column].append(dataset["label"])
+                            data_dict[x_column].append(point['x'])
+                            data_dict[y_column].append(point['y'])
+                    source_data = pd.DataFrame(data_dict)
+                else:
+                    chart_type = "Grouped Bar Chart"
+                    label_column = "VPN provider"
+                    value_columns = list(first_dataset.keys())
+                    data_dict = {label_column: list(first_dataset.keys())}
+                    for dataset in datasets:
+                        data_dict[dataset["label"]] = list(dataset["data"].values())
+                    source_data = pd.DataFrame(data_dict).transpose()
+                    source_data.columns = source_data.iloc[0]
+                    source_data = source_data.drop(source_data.index[0])
+                    source_data.reset_index(inplace=True)
+                    source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
 
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
@@ -263,7 +265,7 @@ if source_data is not None:
 
         # Generate ld+json metadata
         if chart_type == "Scatter Chart":
-            data_dict = {provider: {x_column: provider_data[x_column].tolist(), y_column: provider_data[y_column].tolist()} for provider in source_data[label_column].unique()}
+            data_dict = {provider: {x_column: [point['x'] for point in provider_data], y_column: [point['y'] for point in provider_data]} for provider, provider_data in source_data.groupby(label_column)}
         else:
             data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
         
