@@ -139,8 +139,9 @@ if source_data is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
     # Select the columns for the chart
-    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
+    if not source_data.empty:
+        label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
+        value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns[1:], key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -175,9 +176,9 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data[label_column].unique()
+            unique_providers = source_data.index.unique()
             for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
+                provider_data = source_data.loc[provider]
                 data = [
                     float(provider_data[col].split(' ')[0]) if not pd.isna(provider_data[col]) else null_value
                     for col in value_columns
