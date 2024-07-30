@@ -7,6 +7,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
 import uuid
+import random
+import string
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -37,6 +39,11 @@ nice_colors = [
 def get_provider_color(provider_name):
     provider_name = provider_name.lower()
     return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+
+# Function to generate a unique ID
+def generate_unique_id(title):
+    random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+    return f"{title.replace(' ', '_')}_{random_str}"
 
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
@@ -301,15 +308,15 @@ if source_data is not None:
         }
 
         # Generate the HTML content for insertion
-        unique_id = str(uuid.uuid4())
+        unique_id = generate_unique_id(seo_title)
         html_content = f"""
 <div id="{unique_id}" style="max-width: {chart_width}px; margin: 0 auto;">
-    <canvas class="jschartgraphic" id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
+    <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id}" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
+        var ctx = document.getElementById('vpnSpeedChart_{unique_id}').getContext('2d');
         
         var vpnSpeedChart = new Chart(ctx, {{
             type: '{'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
