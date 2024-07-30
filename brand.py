@@ -113,14 +113,13 @@ if action == "Create New Chart":
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
         source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
-        st.dataframe(source_data)  # Display the source data for debugging
+        source_data = st.data_editor(source_data)
 
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            st.write("Loaded chart data:", chart_data)  # Debugging output
             datasets = [{"label": k, "data": v} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
@@ -160,7 +159,7 @@ elif action == "Update Existing Chart":
                     source_data.reset_index(inplace=True)
                     source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
             st.write("Data Preview:")
-            st.dataframe(source_data)  # Display the source data for debugging
+            source_data = st.data_editor(source_data)
 
 if source_data is not None:
     # Select the type of chart
@@ -214,14 +213,12 @@ if source_data is not None:
             for provider in source_data[label_column].unique():
                 provider_data = source_data[source_data[label_column] == provider]
                 try:
-                    st.write(f"Provider: {provider}, Data: {provider_data}")
                     x_val = provider_data[x_column].values[0]
                     y_val = provider_data[y_column].values[0]
                     if isinstance(x_val, list):
                         x_val = x_val[0]
                     if isinstance(y_val, list):
                         y_val = y_val[0]
-                    st.write(f"x_val: {x_val}, y_val: {y_val}")  # Debugging
                     x_val = float(str(x_val))
                     y_val = float(str(y_val))
                     x_values.append(x_val)
@@ -423,6 +420,3 @@ if source_data is not None:
 
         # Provide the public URL of the uploaded chart
         st.write(f"Chart has been uploaded to Firebase. [View Chart]({public_url})")
-
-# Ensure to include logging for each step
-st.write("Log:")
