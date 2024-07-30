@@ -208,8 +208,8 @@ if source_data is not None:
                 provider_data = source_data[source_data[label_column] == provider]
                 try:
                     st.write(f"Provider: {provider}, Data: {provider_data}")
-                    x_val = provider_data[x_column].values[0]
-                    y_val = provider_data[y_column].values[0]
+                    x_val = provider_data[x_column].values[0][0]  # Extract first element from list
+                    y_val = provider_data[y_column].values[0][0]  # Extract first element from list
                     st.write(f"x_val: {x_val}, y_val: {y_val}")  # Debugging
                     x_val = float(str(x_val))
                     y_val = float(str(y_val))
@@ -220,6 +220,9 @@ if source_data is not None:
                     continue
                 except KeyError as e:
                     st.error(f"Missing data for provider '{provider}': {e}")
+                    continue
+                except IndexError as e:
+                    st.error(f"List index error for provider '{provider}': {e}")
                     continue
                 scatter_data = [{'x': x_val, 'y': y_val}]
                 background_colors = [get_provider_color(provider)]
