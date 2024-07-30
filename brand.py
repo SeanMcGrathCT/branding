@@ -207,8 +207,12 @@ if source_data is not None:
             for provider in source_data[label_column].unique():
                 provider_data = source_data[source_data[label_column] == provider]
                 try:
-                    x_val = float(provider_data[x_column].values[0])
-                    y_val = float(provider_data[y_column].values[0])
+                    st.write(f"Provider: {provider}, Data: {provider_data}")
+                    x_val = provider_data[x_column].values[0]
+                    y_val = provider_data[y_column].values[0]
+                    st.write(f"x_val: {x_val}, y_val: {y_val}")  # Debugging
+                    x_val = float(str(x_val))
+                    y_val = float(str(y_val))
                     x_values.append(x_val)
                     y_values.append(y_val)
                 except ValueError as e:
