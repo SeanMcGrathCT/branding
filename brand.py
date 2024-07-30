@@ -120,7 +120,7 @@ elif action == "Update Existing Chart":
             empty_bar_text = "No data available"
             display_legend = True
             grouping_method = "Provider"
-            if "Average" in labels:
+            if "Average" in labels[0]:
                 grouping_method = "Test Type"
             chart_size = "Full Width"
             chart_width = 805
@@ -137,12 +137,15 @@ elif action == "Update Existing Chart":
             source_data = st.experimental_data_editor(source_data)
 
 if source_data is not None:
+    # Remove any numerical index columns
+    source_data.reset_index(drop=True, inplace=True)
+    
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
     # Select the columns for the chart
     label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns, key='value_columns')
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -225,7 +228,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]}" for col in value_columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
