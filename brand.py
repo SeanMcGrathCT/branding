@@ -198,11 +198,11 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data[label_column].tolist()
-            for i, col in enumerate(value_columns):
+            labels = list(source_data.columns)
+            for i, provider in enumerate(source_data.index):
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
-                    for value in source_data[col].tolist()
+                    for value in source_data.loc[provider, :].tolist()
                 ]
                 background_colors = [
                     nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
@@ -213,7 +213,7 @@ if source_data is not None:
                     for value in values
                 ]
                 datasets.append({
-                    'label': col,
+                    'label': provider,
                     'data': values,
                     'backgroundColor': background_colors,
                     'borderColor': border_colors,
@@ -226,7 +226,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in source_data.columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
@@ -334,3 +334,4 @@ if source_data is not None:
 
 # Ensure to include logging for each step
 st.write("Log:")
+
