@@ -120,6 +120,7 @@ elif action == "Update Existing Chart":
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
+            st.write("Loaded chart data:", chart_data)  # Debugging output
             datasets = [{"label": k, "data": v} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
@@ -351,8 +352,8 @@ if source_data is not None:
                 scales: {{
                     x: {{
                         beginAtZero: false,
-                        min: {x_min - 1},
-                        max: {x_max + 1},
+                        {"min: " + str(x_min - 1) + "," if chart_type == "Scatter Chart" else ""}
+                        {"max: " + str(x_max + 1) + "," if chart_type == "Scatter Chart" else ""}
                         title: {{
                             display: true,
                             text: '{x_column if chart_type == 'Scatter Chart' else ''}'
@@ -360,8 +361,8 @@ if source_data is not None:
                     }},
                     y: {{
                         beginAtZero: false,
-                        min: {y_min - 5},
-                        max: {y_max + 5},
+                        {"min: " + str(y_min - 5) + "," if chart_type == "Scatter Chart" else ""}
+                        {"max: " + str(y_max + 5) + "," if chart_type == "Scatter Chart" else ""}
                         title: {{
                             display: true,
                             text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
@@ -420,3 +421,6 @@ if source_data is not None:
 
         # Provide the public URL of the uploaded chart
         st.write(f"Chart has been uploaded to Firebase. [View Chart]({public_url})")
+
+# Ensure to include logging for each step
+st.write("Log:")
