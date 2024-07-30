@@ -82,7 +82,7 @@ def load_chart_data_from_html(html_content):
         return None
 
 # Radio button for creating or updating chart
-action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_choice')
+action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action')
 
 # Initialize variables for form fields
 seo_title = ""
@@ -101,16 +101,13 @@ source_data = None
 
 if action == "Create New Chart":
     # Upload CSV file
-    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv", key='csv_uploader')
+    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv", key='uploaded_file')
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        try:
-            source_data = st.experimental_data_editor(source_data, key='data_editor_new')
-        except AttributeError:
-            source_data = st.data_editor(source_data, key='data_editor_new')
+        source_data = st.experimental_data_editor(source_data)
 elif action == "Update Existing Chart":
-    chart_html = st.text_area("Paste the HTML content of the existing chart:", key='html_paste')
+    chart_html = st.text_area("Paste the HTML content of the existing chart:", key='chart_html')
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
@@ -118,31 +115,22 @@ elif action == "Update Existing Chart":
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
-            measurement_unit = list(list(chart_data["data"].values())[0].values())[0].split(' ')[-1]
-            y_axis_label = chart_data.get("options", {}).get("scales", {}).get("y", {}).get("title", {}).get("text", "Speed (Mbps)")
-            display_legend = chart_data.get("options", {}).get("plugins", {}).get("legend", {}).get("display", True)
             # Reconstruct the source_data dataframe from the datasets
-            label_column = "Provider"
+            label_column = "VPN provider"
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
-            st.write("Data Preview:")
-            try:
-                source_data = st.experimental_data_editor(source_data, key='data_editor_update')
-            except AttributeError:
-                source_data = st.data_editor(source_data, key='data_editor_update')
+            source_data = pd.DataFrame(data_dict).T.reset_index()
+            source_data.columns = source_data.iloc[0]
+            source_data = source_data[1:]
+            source_data = st.experimental_data_editor(source_data)
 
 if source_data is not None:
-    # Ensure the 'VPN provider' header is present
-    if 'Provider' not in source_data.columns:
-        source_data.insert(0, 'Provider', source_data.index)
-
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"], key='chart_type')
 
     # Select the columns for the chart
-    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column', index=0)
+    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, index=0, key='label_column')
     value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
 
     # Input measurement unit
@@ -159,7 +147,7 @@ if source_data is not None:
     empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text, key='empty_bar_text')
 
     # Select chart size
-    chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"], index=1 if chart_width == 805 else 0, key='chart_size')
+    chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"], key='chart_size')
     if chart_size == "Small":
         chart_width = 500
         chart_height = 300
@@ -226,7 +214,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]}" for col in value_columns} for provider in source_data[label_column].unique()}
+            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in value_columns} for provider in source_data[label_column].unique()}
         }
 
         # Generate the HTML content for insertion
