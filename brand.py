@@ -116,12 +116,11 @@ elif action == "Update Existing Chart":
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             # Reconstruct the source_data dataframe from the datasets
-            label_column = "Provider"
+            label_column = "VPN provider"  # Update the header to "VPN provider"
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
             source_data = pd.DataFrame(data_dict)
-            source_data = source_data.set_index(label_column).transpose()
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
@@ -167,14 +166,15 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(mapped_columns.keys())
-            unique_providers = source_data.index
+            unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
+                provider_data = source_data[source_data[label_column] == provider]
                 data = [
-                    source_data.at[provider, col] if not pd.isna(source_data.at[provider, col]) else null_value
+                    float(provider_data[col].values[0].replace(' Mbps', '')) if not pd.isna(provider_data[col].values[0]) else null_value
                     for col in mapped_columns.values()
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(source_data.at[provider, col]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
                     for col in mapped_columns.values()
                 ]
                 border_colors = background_colors
@@ -186,10 +186,10 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data.index.tolist()
+            labels = source_data[label_column].tolist()
             for i, col in enumerate(mapped_columns.values()):
                 values = [
-                    value if not pd.isna(value) else null_value
+                    float(value.replace(' Mbps', '')) if not pd.isna(value) else null_value
                     for value in source_data[col].tolist()
                 ]
                 background_colors = [
@@ -214,12 +214,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {
-                provider: {
-                    col: f"{source_data.at[provider, col]} {measurement_unit}"
-                    for col in mapped_columns.values()
-                } for provider in source_data.index
-            }
+            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]}" for col in mapped_columns.values()} for provider in source_data[label_column].unique()}
         }
 
         # Generate the HTML content for insertion
