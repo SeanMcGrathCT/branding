@@ -230,7 +230,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]}" for col in value_columns} for provider in source_data[label_column]}
+            "data": {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
         }
 
         # Generate the HTML content for insertion
