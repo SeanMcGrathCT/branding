@@ -206,8 +206,8 @@ if source_data is not None:
                         x_val = x_val[0]
                     if isinstance(y_val, list):
                         y_val = y_val[0]
-                    x_val = float(str(x_val))
-                    y_val = float(str(y_val))
+                    x_val = float(str(x_val).split(' ')[0])
+                    y_val = float(str(y_val).split(' ')[0])
                     x_values.append(x_val)
                     y_values.append(y_val)
                     scatter_data = [{'x': x_val, 'y': y_val}]
