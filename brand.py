@@ -200,7 +200,7 @@ if source_data is not None:
             labels = source_data.index.tolist()
             for i, col in enumerate(value_columns):
                 values = [
-                    float(value.split(' ')[0]) if not pd.isna(value) else null_value
+                    float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
                     for value in source_data[col].tolist()
                 ]
                 background_colors = [
