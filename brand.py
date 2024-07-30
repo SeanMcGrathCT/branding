@@ -209,11 +209,14 @@ if source_data is not None:
                 try:
                     x_val = float(provider_data[x_column].values[0])
                     y_val = float(provider_data[y_column].values[0])
+                    x_values.append(x_val)
+                    y_values.append(y_val)
                 except ValueError as e:
-                    st.error(f"Error converting values to float: {e}")
+                    st.error(f"Error converting values to float for provider '{provider}': {e}")
                     continue
-                x_values.append(x_val)
-                y_values.append(y_val)
+                except KeyError as e:
+                    st.error(f"Missing data for provider '{provider}': {e}")
+                    continue
                 scatter_data = [{'x': x_val, 'y': y_val}]
                 background_colors = [get_provider_color(provider)]
                 border_colors = background_colors
