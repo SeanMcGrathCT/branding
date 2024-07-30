@@ -232,8 +232,12 @@ if source_data is not None:
                     'borderWidth': 1,
                     'showLine': False
                 })
-            x_min, x_max = min(x_values), max(x_values)
-            y_min, y_max = min(y_values), max(y_values)
+            if x_values and y_values:
+                x_min, x_max = min(x_values), max(x_values)
+                y_min, y_max = min(y_values), max(y_values)
+            else:
+                x_min, x_max = 0, 0
+                y_min, y_max = 0, 0
         elif grouping_method == "Provider":
             labels = list(value_columns)
             unique_providers = source_data[label_column].unique()
