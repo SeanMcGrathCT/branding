@@ -122,7 +122,7 @@ elif action == "Update Existing Chart":
             chart_size = "Full Width"
             chart_width = 805
             chart_height = 600
-
+            
             # Determine chart type based on data structure
             if datasets and isinstance(datasets[0]["data"], list) and datasets[0]["data"]:
                 first_dataset = datasets[0]["data"]
@@ -265,7 +265,7 @@ if source_data is not None:
 
         # Generate ld+json metadata
         if chart_type == "Scatter Chart":
-            data_dict = {provider: {x_column: [point['x'] for point in provider_data.to_dict(orient='records')], y_column: [point['y'] for point in provider_data.to_dict(orient='records')]} for provider, provider_data in source_data.groupby(label_column)}
+            data_dict = {provider: {x_column: provider_data[x_column].tolist(), y_column: provider_data[y_column].tolist()} for provider, provider_data in source_data.groupby(label_column)}
         else:
             data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
         
