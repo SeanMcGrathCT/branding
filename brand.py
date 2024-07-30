@@ -112,7 +112,6 @@ elif action == "Update Existing Chart":
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
             labels = list(chart_data["data"].values())[0].keys()
-            st.write(f"Extracted labels: {labels}")  # Debugging print
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
@@ -121,8 +120,6 @@ elif action == "Update Existing Chart":
             empty_bar_text = "No data available"
             display_legend = True
             grouping_method = "Provider"
-            if labels and "Average" in labels[0]:
-                grouping_method = "Test Type"
             chart_size = "Full Width"
             chart_width = 805
             chart_height = 600
@@ -143,7 +140,7 @@ if source_data is not None:
 
     # Select the columns for the chart
     label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns[1:], key='value_columns')
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -198,22 +195,19 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = list(source_data.columns)
-            for i, provider in enumerate(source_data.index):
+            labels = source_data.columns.tolist()
+            for i, col in enumerate(value_columns):
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
-                    for value in source_data.loc[provider, :].tolist()
+                    for value in source_data[col].tolist()
                 ]
                 background_colors = [
                     nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
-                border_colors = [
-                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
-                    for value in values
-                ]
+                border_colors = background_colors
                 datasets.append({
-                    'label': provider,
+                    'label': col,
                     'data': values,
                     'backgroundColor': background_colors,
                     'borderColor': border_colors,
@@ -226,7 +220,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in source_data.columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
@@ -334,4 +328,3 @@ if source_data is not None:
 
 # Ensure to include logging for each step
 st.write("Log:")
-
