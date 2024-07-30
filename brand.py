@@ -137,12 +137,17 @@ elif action == "Update Existing Chart":
             source_data = st.experimental_data_editor(source_data)
 
 if source_data is not None:
+    # Ensure the first row is used as headers
+    if isinstance(source_data.columns[0], int):
+        source_data.columns = source_data.iloc[0]
+        source_data = source_data[1:]
+
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
     # Select the columns for the chart
     label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns, key='value_columns')
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -225,7 +230,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]}" for col in value_columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
