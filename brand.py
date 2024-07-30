@@ -107,13 +107,13 @@ if action == "Create New Chart":
         st.write("Data Preview:")
         source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
         st.dataframe(source_data)  # Display the source data for debugging
-        source_data = st.experimental_data_editor(source_data)
 
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
+            st.write("Loaded chart data:", chart_data)  # Debugging output
             datasets = [{"label": k, "data": v} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
