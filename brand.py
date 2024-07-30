@@ -120,7 +120,11 @@ elif action == "Update Existing Chart":
             empty_bar_text = "No data available"
             display_legend = True
             grouping_method = "Provider"
-            
+            if "Average" in labels[0]:
+                grouping_method = "Test Type"
+            chart_size = "Full Width"
+            chart_width = 805
+            chart_height = 600
             # Reconstruct the source_data dataframe from the datasets
             label_column = "VPN provider"
             data_dict = {label_column: labels}
@@ -129,21 +133,17 @@ elif action == "Update Existing Chart":
             source_data = pd.DataFrame(data_dict).transpose()
             source_data.columns = source_data.iloc[0]
             source_data = source_data.drop(source_data.index[0])
-            
-            # Check if grouping method should be by Test Type
-            if any("Average" in label for label in source_data.columns):
-                grouping_method = "Test Type"
-                
             st.write("Data Preview:")
-            source_data = st.data_editor(source_data, num_rows="dynamic")
+            source_data = st.data_editor(source_data)
 
 if source_data is not None:
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
     # Select the columns for the chart
+    st.write(f"Columns in source data: {source_data.columns}")  # Debugging print statement
     label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=list(source_data.columns[1:]), key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
