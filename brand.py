@@ -153,18 +153,19 @@ if source_data is not None:
         else:
             value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
-    # Input measurement unit
-    measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
-
     # Input SEO title and description
     seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
     seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
 
-    # Input Y axis label
-    y_axis_label = st.text_input("Enter the Y axis label:", y_axis_label)
+    if chart_type != "Scatter Chart":
+        # Input Y axis label
+        y_axis_label = st.text_input("Enter the Y axis label:", y_axis_label)
 
-    # Input text for empty bars
-    empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text)
+        # Input text for empty bars
+        empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text)
+
+        # Select grouping method
+        grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
 
     # Select chart size
     chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"])
@@ -174,10 +175,6 @@ if source_data is not None:
     else:
         chart_width = 805
         chart_height = 600
-
-    # Select grouping method
-    if chart_type != "Scatter Chart":
-        grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
 
     # Select whether to display the legend
     display_legend = st.checkbox("Display legend", value=display_legend)
@@ -293,6 +290,9 @@ if source_data is not None:
                                 if (context.raw <= {null_value * 1.1}) {{
                                     return '{empty_bar_text}';
                                 }}
+                                if ('x' in context.raw && 'y' in context.raw) {{
+                                    return context.dataset.label + ': (' + context.raw.x + ', ' + context.raw.y + ')';
+                                }}
                                 return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
                             }}
                         }}
@@ -302,7 +302,7 @@ if source_data is not None:
                     x: {{
                         beginAtZero: true,
                         title: {{
-                            display: {str(chart_type == 'Scatter Chart').lower()},
+                            display: true,
                             text: '{x_column if chart_type == 'Scatter Chart' else ''}'
                         }}
                     }},
@@ -310,7 +310,7 @@ if source_data is not None:
                         beginAtZero: true,
                         title: {{
                             display: true,
-                            text: '{y_axis_label}'
+                            text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
                         }}
                     }}
                 }}
