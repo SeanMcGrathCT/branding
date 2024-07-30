@@ -112,6 +112,7 @@ elif action == "Update Existing Chart":
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
             labels = list(chart_data["data"].values())[0].keys()
+            st.write(f"Extracted labels: {labels}")  # Debugging print
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
@@ -130,11 +131,9 @@ elif action == "Update Existing Chart":
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
-            source_data = source_data.T.reset_index().T  # Fix header row
+            source_data = pd.DataFrame(data_dict).transpose()
             source_data.columns = source_data.iloc[0]
             source_data = source_data.drop(source_data.index[0])
-            source_data = source_data.reset_index(drop=True)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
@@ -144,7 +143,7 @@ if source_data is not None:
 
     # Select the columns for the chart
     label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
+    value_columns = st.multiselect("Select the columns for tests:", source_data.columns, default=source_data.columns[1:], key='value_columns')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -179,9 +178,9 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data[label_column].unique()
+            unique_providers = source_data.index.unique()
             for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
+                provider_data = source_data.loc[provider]
                 data = [
                     float(provider_data[col].split(' ')[0]) if not pd.isna(provider_data[col]) else null_value
                     for col in value_columns
