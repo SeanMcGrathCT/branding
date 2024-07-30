@@ -209,11 +209,11 @@ if source_data is not None:
                     for value in source_data[col].tolist()
                 ]
                 background_colors = [
-                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
                 border_colors = [
-                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
                 datasets.append({
