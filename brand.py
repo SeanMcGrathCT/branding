@@ -130,8 +130,11 @@ elif action == "Update Existing Chart":
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
             source_data = pd.DataFrame(data_dict)
+            source_data = source_data.transpose()
+            source_data.columns = source_data.iloc[0]
+            source_data = source_data.drop(source_data.index[0])
+            source_data = source_data.reset_index().rename(columns={'index': 'VPN provider'})
             st.write("Data Preview:")
-            source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
             source_data = st.data_editor(source_data)
 
 if source_data is not None:
@@ -179,15 +182,15 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data.index.unique()
+            unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
-                provider_data = source_data.loc[provider]
+                provider_data = source_data[source_data[label_column] == provider]
                 data = [
-                    float(provider_data[col].split(' ')[0]) if not pd.isna(provider_data[col]) else null_value
+                    float(provider_data[col].values[0].split(' ')[0]) if not pd.isna(provider_data[col].values[0]) else null_value
                     for col in value_columns
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
                     for col in value_columns
                 ]
                 border_colors = background_colors
@@ -199,7 +202,7 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data.index.tolist()
+            labels = source_data[label_column].tolist()
             for i, col in enumerate(value_columns):
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
