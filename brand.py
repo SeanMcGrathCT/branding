@@ -7,6 +7,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
 import uuid
+import requests
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -57,39 +58,18 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
     blob.upload_from_filename(file_path)
     return blob.public_url
 
-def load_chart_data_from_html(html_content):
-    try:
-        # Locate the start and end of the JSON data within the script
-        start_marker = '<script type="application/ld+json">'
-        end_marker = '</script>'
-        
-        start = html_content.find(start_marker)
-        end = html_content.find(end_marker, start)
-
-        if start == -1 or end == -1:
-            raise ValueError("Could not find the JSON data section in the provided HTML content.")
-        
-        # Extract and clean the JSON data
-        json_data = html_content[start+len(start_marker):end].strip()
-        
-        data = json.loads(json_data)
+def load_chart_data_from_html(html_url):
+    response = requests.get(html_url)
+    if response.status_code == 200:
+        html_content = response.text
+        start = html_content.find('data: {') + len('data: ')
+        end = html_content.find('options: {') - 1
+        data_json = html_content[start:end].strip()
+        data = json.loads(data_json)
         return data
-    except json.JSONDecodeError as e:
-        st.error(f"Failed to parse JSON data from HTML content: {e}")
+    else:
+        st.error("Failed to load chart data from the given URL.")
         return None
-    except ValueError as e:
-        st.error(e)
-        return None
-
-def construct_dataframe_from_chart_data(chart_data):
-    data_dict = {}
-    for provider, tests in chart_data["data"].items():
-        for test, value in tests.items():
-            value = float(value.split()[0])
-            if test not in data_dict:
-                data_dict[test] = {}
-            data_dict[test][provider] = value
-    return pd.DataFrame(data_dict).transpose()
 
 # Radio button for creating or updating chart
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"])
@@ -115,25 +95,39 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data = st.data_editor(source_data)
+        st.dataframe(source_data)
 elif action == "Update Existing Chart":
-    chart_html = st.text_area("Paste the HTML content of the existing chart:")
-    if chart_html:
-        chart_data = load_chart_data_from_html(chart_html)
+    chart_url = st.text_input("Enter the URL of the existing chart:")
+    if chart_url:
+        chart_data = load_chart_data_from_html(chart_url)
         if chart_data:
-            seo_title = chart_data.get("name", "")
-            seo_description = chart_data.get("description", "")
-            source_data = construct_dataframe_from_chart_data(chart_data)
+            labels = chart_data["labels"]
+            datasets = chart_data["datasets"]
+            seo_title = chart_data.get("seo_title", "")
+            seo_description = chart_data.get("seo_description", "")
+            measurement_unit = chart_data.get("measurement_unit", "Mbps")
+            y_axis_label = chart_data.get("y_axis_label", "Speed (Mbps)")
+            empty_bar_text = chart_data.get("empty_bar_text", "No data available")
+            display_legend = chart_data.get("display_legend", True)
+            # Reconstruct the source_data dataframe from the datasets
+            label_column = "Test Type"
+            data_dict = {label_column: labels}
+            for dataset in datasets:
+                data_dict[dataset["label"]] = dataset["data"]
+            source_data = pd.DataFrame(data_dict).set_index(label_column).T
             st.write("Data Preview:")
-            source_data = st.data_editor(source_data)
+            st.dataframe(source_data)
 
 if source_data is not None:
+    # Allow the user to edit the source data
+    edited_data = st.experimental_data_editor(source_data)
+
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
     # Select the columns for the chart
-    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns)
-    value_columns = st.multiselect("Select the columns for tests:", source_data.columns)
+    label_column = st.selectbox("Select the column for VPN providers:", edited_data.columns)
+    value_columns = st.multiselect("Select the columns for tests:", edited_data.columns)
     mapped_columns = {col: col for col in value_columns}
 
     # Input measurement unit
@@ -169,15 +163,15 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(mapped_columns.keys())
-            unique_providers = source_data.index.unique()
+            unique_providers = edited_data[label_column].unique()
             for provider in unique_providers:
-                provider_data = source_data.loc[provider]
+                provider_data = edited_data[edited_data[label_column] == provider]
                 data = [
-                    provider_data[col] if not pd.isna(provider_data[col]) else null_value
+                    provider_data[col].values[0] if not pd.isna(provider_data[col].values[0]) else null_value
                     for col in mapped_columns.values()
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
                     for col in mapped_columns.values()
                 ]
                 border_colors = background_colors
@@ -189,11 +183,11 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data.columns.tolist()
+            labels = edited_data.index.tolist()
             for i, col in enumerate(mapped_columns.values()):
                 values = [
                     value if not pd.isna(value) else null_value
-                    for value in source_data[col].tolist()
+                    for value in edited_data[col].tolist()
                 ]
                 background_colors = [
                     nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
@@ -217,7 +211,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.loc[provider, col]} {measurement_unit}" for col in mapped_columns.values()} for provider in source_data.index.unique()}
+            "data": {provider: {col: f"{edited_data.at[provider, col]} {measurement_unit}" for col in mapped_columns.values()} for provider in edited_data.index}
         }
 
         # Generate the HTML content for insertion
