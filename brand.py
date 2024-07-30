@@ -139,7 +139,7 @@ elif action == "Update Existing Chart":
 
 if source_data is not None:
     # Select the type of chart
-    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
+    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart"])
 
     # Select the columns for the chart
     if not source_data.empty:
@@ -147,7 +147,11 @@ if source_data is not None:
         # Ensure the default value columns are valid columns in the dataframe
         valid_columns = list(source_data.columns)
         default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
-        value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
+        if chart_type != "Scatter Chart":
+            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
+        else:
+            x_column = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
+            y_column = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
 
     # Input measurement unit
     measurement_unit = st.text_input("Enter the unit of measurement (e.g., Mbps):", measurement_unit)
@@ -172,7 +176,8 @@ if source_data is not None:
         chart_height = 600
 
     # Select grouping method
-    grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
+    if chart_type != "Scatter Chart":
+        grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
 
     # Select whether to display the legend
     display_legend = st.checkbox("Display legend", value=display_legend)
@@ -180,7 +185,24 @@ if source_data is not None:
     if st.button("Generate HTML"):
         datasets = []
         null_value = 0.05  # Small fixed value for null entries
-        if grouping_method == "Provider":
+        if chart_type == "Scatter Chart":
+            labels = []
+            for provider in source_data[label_column].unique():
+                provider_data = source_data[source_data[label_column] == provider]
+                x_values = provider_data[x_column].tolist()
+                y_values = provider_data[y_column].tolist()
+                scatter_data = [{'x': x, 'y': y} for x, y in zip(x_values, y_values)]
+                background_colors = [get_provider_color(provider)] * len(scatter_data)
+                border_colors = background_colors
+                datasets.append({
+                    'label': provider,
+                    'data': scatter_data,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
+                    'borderWidth': 1,
+                    'showLine': False
+                })
+        elif grouping_method == "Provider":
             labels = list(value_columns)
             unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
@@ -222,12 +244,17 @@ if source_data is not None:
                 })
 
         # Generate ld+json metadata
+        if chart_type == "Scatter Chart":
+            data_dict = {provider: {x_column: provider_data[x_column].tolist(), y_column: provider_data[y_column].tolist()} for provider in source_data[label_column].unique()}
+        else:
+            data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
+        
         metadata = {
             "@context": "http://schema.org",
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
+            "data": data_dict
         }
 
         # Generate the HTML content for insertion
@@ -242,7 +269,7 @@ if source_data is not None:
         var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
         
         var vpnSpeedChart = new Chart(ctx, {{
-            type: 'bar',
+            type: '{'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
             data: {{
                 labels: {json.dumps(labels)},
                 datasets: {json.dumps(datasets)}
@@ -272,6 +299,13 @@ if source_data is not None:
                     }}
                 }},
                 scales: {{
+                    x: {{
+                        beginAtZero: true,
+                        title: {{
+                            display: {str(chart_type == 'Scatter Chart').lower()},
+                            text: '{x_column if chart_type == 'Scatter Chart' else ''}'
+                        }}
+                    }},
                     y: {{
                         beginAtZero: true,
                         title: {{
