@@ -164,7 +164,7 @@ elif action == "Update Existing Chart":
 
 if source_data is not None:
     # Select the type of chart
-    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart"], index=["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart"].index(chart_type))
+    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"], index=["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"].index(chart_type))
 
     # Select the columns for the chart
     if not source_data.empty:
@@ -175,6 +175,8 @@ if source_data is not None:
         if chart_type == "Scatter Chart":
             x_column = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
             y_column = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
+        elif chart_type == "Radar Chart":
+            value_columns = st.multiselect("Select the columns for the radar chart:", valid_columns, default=default_columns, key='value_columns')
         else:
             value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
@@ -186,20 +188,29 @@ if source_data is not None:
         # Input Y axis label
         y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
 
-        # Input text for empty bars
-        empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text)
+    # Input measurement unit
+    measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit)
 
-        # Select grouping method
-        grouping_method = st.selectbox("Group data by:", ["Provider", "Test Type"])
+    # Input text for empty bar tooltip
+    empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text)
 
     # Select chart size
-    chart_size = st.selectbox("Select the chart size:", ["Small", "Full Width"])
-    if chart_size == "Small":
-        chart_width = 500
-        chart_height = 300
-    else:
+    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
+    if chart_size == "Full Width":
         chart_width = 805
         chart_height = 600
+    elif chart_size == "Medium":
+        chart_width = 605
+        chart_height = 500
+    else:
+        chart_width = 405
+        chart_height = 400
+
+    # Grouping method for bar charts
+    if chart_type == "Grouped Bar Chart":
+        grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
+    else:
+        grouping_method = "Provider"
 
     # Display legend
     display_legend = st.checkbox("Display legend", value=display_legend)
@@ -250,6 +261,24 @@ if source_data is not None:
             else:
                 x_min, x_max = 0, 0
                 y_min, y_max = 0, 0
+        elif chart_type == "Radar Chart":
+            labels = value_columns
+            unique_providers = source_data[label_column].unique()
+            for provider in unique_providers:
+                provider_data = source_data[source_data[label_column] == provider]
+                data = [
+                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
+                    for col in value_columns
+                ]
+                background_colors = [get_provider_color(provider) for _ in value_columns]
+                border_colors = background_colors
+                datasets.append({
+                    'label': provider,
+                    'data': data,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
+                    'borderWidth': 1
+                })
         elif grouping_method == "Provider":
             labels = list(value_columns)
             unique_providers = source_data[label_column].unique()
@@ -297,6 +326,8 @@ if source_data is not None:
         # Generate ld+json metadata
         if chart_type == "Scatter Chart":
             data_dict = {provider: {x_column: provider_data[x_column].tolist(), y_column: provider_data[y_column].tolist()} for provider, provider_data in source_data.groupby(label_column)}
+        elif chart_type == "Radar Chart":
+            data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
         else:
             data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
         
@@ -320,7 +351,7 @@ if source_data is not None:
         var ctx = document.getElementById('vpnSpeedChart_{unique_id}').getContext('2d');
         
         var vpnSpeedChart = new Chart(ctx, {{
-            type: '{'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
+            type: '{'scatter' if chart_type == 'Scatter Chart' else 'radar' if chart_type == 'Radar Chart' else 'bar'}',
             data: {{
                 labels: {json.dumps(labels)},
                 datasets: {json.dumps(datasets, default=str)}
@@ -388,39 +419,9 @@ if source_data is not None:
 
         # Upload the file to Firebase Storage
         bucket = storage.bucket()
-        public_url = upload_to_firebase_storage(html_file_path, bucket, f"charts/{unique_id}.html")
+        destination_blob_name = f"charts/{html_file_path}"
+        public_url = upload_to_firebase_storage(html_file_path, bucket, destination_blob_name)
 
-        # Log the upload to Google Sheets
-        google_credentials = service_account.Credentials.from_service_account_info(
-            dict(st.secrets["GCP_SERVICE_ACCOUNT"])
-        )
-        service = build('sheets', 'v4', credentials=google_credentials)
-        sheet = service.spreadsheets()
-
-        # Prepare the data to be logged
-        log_data = [
-            unique_id,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            seo_title,
-            seo_description,
-            public_url
-        ]
-
-        # Append the data to the Google Sheets
-        sheet.values().append(
-            spreadsheetId="1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q",
-            range="charts!A:E",
-            valueInputOption="USER_ENTERED",
-            body={"values": [log_data]}
-        ).execute()
-
-        # Display download button for the HTML content
-        st.download_button(
-            label="Download HTML",
-            data=html_content,
-            file_name="vpn_speed_comparison.html",
-            mime="text/html"
-        )
-
-        # Provide the public URL of the uploaded chart
-        st.write(f"Chart has been uploaded to Firebase. [View Chart]({public_url})")
+        # Display the public URL
+        st.success(f"Chart generated and uploaded successfully! [View Chart]({public_url})")
+        st.markdown(f"[View Chart]({public_url})")
