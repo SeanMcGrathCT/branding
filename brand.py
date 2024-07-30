@@ -200,14 +200,8 @@ if source_data is not None:
             for provider in source_data[label_column].unique():
                 provider_data = source_data[source_data[label_column] == provider]
                 try:
-                    x_val = provider_data[x_column].values[0]
-                    y_val = provider_data[y_column].values[0]
-                    if isinstance(x_val, list):
-                        x_val = x_val[0]
-                    if isinstance(y_val, list):
-                        y_val = y_val[0]
-                    x_val = float(str(x_val).split(' ')[0])
-                    y_val = float(str(y_val).split(' ')[0])
+                    x_val = float(provider_data[x_column].values[0])
+                    y_val = float(provider_data[y_column].values[0])
                     x_values.append(x_val)
                     y_values.append(y_val)
                     scatter_data = [{'x': x_val, 'y': y_val}]
@@ -224,8 +218,9 @@ if source_data is not None:
                 except ValueError as e:
                     st.error(f"Error converting values to float for provider '{provider}': {e}")
                     continue
-            x_min, x_max = min(x_values), max(x_values)
-            y_min, y_max = min(y_values), max(y_values)
+            if x_values and y_values:
+                x_min, x_max = min(x_values), max(x_values)
+                y_min, y_max = min(y_values), max(y_values)
         elif chart_type == "Radar Chart":
             labels = value_columns
             for provider in source_data[label_column].unique():
@@ -349,8 +344,8 @@ if source_data is not None:
                 scales: {{
                     x: {{
                         beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {x_min - 1} if chart_type == 'Scatter Chart' else null,
-                        max: {x_max + 1} if chart_type == 'Scatter Chart' else null,
+                        min: {(x_min - 1) if chart_type == 'Scatter Chart' else 'null'},
+                        max: {(x_max + 1) if chart_type == 'Scatter Chart' else 'null'},
                         title: {{
                             display: true,
                             text: '{x_column if chart_type == 'Scatter Chart' else ''}'
@@ -358,8 +353,8 @@ if source_data is not None:
                     }},
                     y: {{
                         beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {y_min - 5} if chart_type == 'Scatter Chart' else null,
-                        max: {y_max + 5} if chart_type == 'Scatter Chart' else null,
+                        min: {(y_min - 5) if chart_type == 'Scatter Chart' else 'null'},
+                        max: {(y_max + 5) if chart_type == 'Scatter Chart' else 'null'},
                         title: {{
                             display: true,
                             text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
