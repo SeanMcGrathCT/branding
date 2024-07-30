@@ -111,8 +111,7 @@ elif action == "Update Existing Chart":
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            labels = list(chart_data["data"].values())[0].keys()
-            datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
+            datasets = [{"label": k, "data": v} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             measurement_unit = "Mbps"  # Assuming the unit is always Mbps
@@ -122,22 +121,40 @@ elif action == "Update Existing Chart":
             chart_size = "Full Width"
             chart_width = 805
             chart_height = 600
-            # Reconstruct the source_data dataframe from the datasets
-            label_column = "VPN provider"
-            data_dict = {label_column: labels}
-            for dataset in datasets:
-                data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict).transpose()
-            source_data.columns = source_data.iloc[0]
-            source_data = source_data.drop(source_data.index[0])
-            source_data.reset_index(inplace=True)
-            source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
+            
+            # Determine chart type based on data structure
+            first_dataset = datasets[0]["data"]
+            if isinstance(first_dataset[0], dict) and 'x' in first_dataset[0] and 'y' in first_dataset[0]:
+                chart_type = "Scatter Chart"
+                label_column = "VPN provider"
+                x_column = list(first_dataset[0].keys())[0]
+                y_column = list(first_dataset[0].keys())[1]
+                data_dict = {label_column: [], x_column: [], y_column: []}
+                for dataset in datasets:
+                    for point in dataset["data"]:
+                        data_dict[label_column].append(dataset["label"])
+                        data_dict[x_column].append(point['x'])
+                        data_dict[y_column].append(point['y'])
+                source_data = pd.DataFrame(data_dict)
+            else:
+                chart_type = "Grouped Bar Chart"
+                label_column = "VPN provider"
+                value_columns = list(first_dataset.keys())
+                data_dict = {label_column: list(first_dataset.keys())}
+                for dataset in datasets:
+                    data_dict[dataset["label"]] = list(dataset["data"].values())
+                source_data = pd.DataFrame(data_dict).transpose()
+                source_data.columns = source_data.iloc[0]
+                source_data = source_data.drop(source_data.index[0])
+                source_data.reset_index(inplace=True)
+                source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
+
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
 if source_data is not None:
     # Select the type of chart
-    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart"])
+    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart"], index=["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart"].index(chart_type))
 
     # Select the columns for the chart
     if not source_data.empty:
