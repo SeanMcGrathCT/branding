@@ -206,8 +206,12 @@ if source_data is not None:
             y_values = []
             for provider in source_data[label_column].unique():
                 provider_data = source_data[source_data[label_column] == provider]
-                x_val = float(provider_data[x_column].values[0])
-                y_val = float(provider_data[y_column].values[0])
+                try:
+                    x_val = float(provider_data[x_column].values[0])
+                    y_val = float(provider_data[y_column].values[0])
+                except ValueError as e:
+                    st.error(f"Error converting values to float: {e}")
+                    continue
                 x_values.append(x_val)
                 y_values.append(y_val)
                 scatter_data = [{'x': x_val, 'y': y_val}]
