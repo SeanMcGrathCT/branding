@@ -106,7 +106,9 @@ if action == "Create New Chart":
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
         source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
-        source_data = st.data_editor(source_data)
+        st.dataframe(source_data)  # Display the source data for debugging
+        source_data = st.experimental_data_editor(source_data)
+
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
@@ -150,9 +152,8 @@ elif action == "Update Existing Chart":
                     source_data = source_data.drop(source_data.index[0])
                     source_data.reset_index(inplace=True)
                     source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
-
             st.write("Data Preview:")
-            st.dataframe(source_data)
+            st.dataframe(source_data)  # Display the source data for debugging
 
 if source_data is not None:
     # Select the type of chart
