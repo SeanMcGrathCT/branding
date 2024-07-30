@@ -273,14 +273,17 @@ if source_data is not None:
                 })
         else:  # Group by Test Type
             labels = source_data[label_column].tolist()
+            color_index = 0
             for i, col in enumerate(value_columns):
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
                     for value in source_data[col].tolist()
                 ]
+                background_color = nice_colors[color_index % len(nice_colors)]
+                color_index += 1
                 background_colors = [
-                    get_provider_color(source_data[label_column][j]) if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
-                    for j, value in enumerate(values)
+                    background_color if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    for value in values
                 ]
                 border_colors = background_colors
                 datasets.append({
@@ -341,7 +344,7 @@ if source_data is not None:
                                 if (context.raw <= {null_value * 1.1}) {{
                                     return '{empty_bar_text}';
                                 }}
-                                if ('x' in context.raw && 'y' in context.raw) {{
+                                if (context.raw.hasOwnProperty('x') && context.raw.hasOwnProperty('y')) {{
                                     return context.dataset.label + ': (' + context.raw.x + ', ' + context.raw.y + ')';
                                 }}
                                 return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
@@ -421,6 +424,3 @@ if source_data is not None:
 
         # Provide the public URL of the uploaded chart
         st.write(f"Chart has been uploaded to Firebase. [View Chart]({public_url})")
-
-# Ensure to include logging for each step
-st.write("Log:")
