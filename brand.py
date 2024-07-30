@@ -120,7 +120,8 @@ elif action == "Update Existing Chart":
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict).set_index('Provider')
+            source_data = pd.DataFrame(data_dict)
+            source_data = source_data.set_index(label_column).transpose()
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
@@ -166,15 +167,14 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(mapped_columns.keys())
-            unique_providers = source_data.index.unique()
+            unique_providers = source_data.index
             for provider in unique_providers:
-                provider_data = source_data.loc[provider]
                 data = [
-                    provider_data[col] if not pd.isna(provider_data[col]) else null_value
+                    source_data.at[provider, col] if not pd.isna(source_data.at[provider, col]) else null_value
                     for col in mapped_columns.values()
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(source_data.at[provider, col]) else 'rgba(169, 169, 169, 0.8)'
                     for col in mapped_columns.values()
                 ]
                 border_colors = background_colors
@@ -218,8 +218,7 @@ if source_data is not None:
                 provider: {
                     col: f"{source_data.at[provider, col]} {measurement_unit}"
                     for col in mapped_columns.values()
-                }
-                for provider in source_data.index
+                } for provider in source_data.index
             }
         }
 
