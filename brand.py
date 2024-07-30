@@ -105,7 +105,7 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data = st.experimental_data_editor(source_data)
+        source_data = st.data_editor(source_data)
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
@@ -122,7 +122,7 @@ elif action == "Update Existing Chart":
                 data_dict[dataset["label"]] = dataset["data"]
             source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
-            source_data = st.experimental_data_editor(source_data)
+            source_data = st.data_editor(source_data)
 
 if source_data is not None:
     # Select the type of chart
