@@ -105,7 +105,7 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data = st.experimental_data_editor(source_data)
+        source_data = st.data_editor(source_data)
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
@@ -135,12 +135,9 @@ elif action == "Update Existing Chart":
                 grouping_method = "Test Type"
                 
             st.write("Data Preview:")
-            source_data = st.experimental_data_editor(source_data)
+            source_data = st.data_editor(source_data, num_rows="dynamic")
 
 if source_data is not None:
-    # Remove any numerical index columns
-    source_data.reset_index(drop=True, inplace=True)
-    
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"])
 
@@ -229,7 +226,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col]}" for col in value_columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
