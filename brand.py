@@ -82,7 +82,7 @@ def load_chart_data_from_html(html_content):
         return None
 
 # Radio button for creating or updating chart
-action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action')
+action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_radio')
 
 # Initialize variables for form fields
 seo_title = ""
@@ -101,13 +101,13 @@ source_data = None
 
 if action == "Create New Chart":
     # Upload CSV file
-    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv", key='uploaded_file')
+    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv", key='upload_csv')
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data = st.experimental_data_editor(source_data)
+        source_data = st.data_editor(source_data)
 elif action == "Update Existing Chart":
-    chart_html = st.text_area("Paste the HTML content of the existing chart:", key='chart_html')
+    chart_html = st.text_area("Paste the HTML content of the existing chart:", key='paste_html')
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
@@ -115,22 +115,26 @@ elif action == "Update Existing Chart":
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
+            y_axis_label = "Speed (Mbps)"  # Assuming this value for now
+            measurement_unit = "Mbps"  # Assuming this value for now
+            chart_size = "Full Width"  # Assuming this value for now
+            grouping_method = "Provider"  # Assuming this value for now
+            display_legend = True  # Assuming this value for now
             # Reconstruct the source_data dataframe from the datasets
             label_column = "VPN provider"
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict).T.reset_index()
-            source_data.columns = source_data.iloc[0]
-            source_data = source_data[1:]
-            source_data = st.experimental_data_editor(source_data)
+            source_data = pd.DataFrame(data_dict).transpose()
+            st.write("Data Preview:")
+            source_data = st.data_editor(source_data)
 
 if source_data is not None:
     # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart"], key='chart_type')
 
     # Select the columns for the chart
-    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, index=0, key='label_column')
+    label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
     value_columns = st.multiselect("Select the columns for tests:", source_data.columns[1:], default=source_data.columns[1:], key='value_columns')
 
     # Input measurement unit
@@ -166,15 +170,15 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data[label_column].unique()
+            unique_providers = source_data.index
             for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
+                provider_data = source_data.loc[provider]
                 data = [
-                    float(provider_data[col].values[0].split(' ')[0]) if not pd.isna(provider_data[col].values[0]) else null_value
+                    float(provider_data[col].split(' ')[0]) if not pd.isna(provider_data[col]) else null_value
                     for col in value_columns
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
                     for col in value_columns
                 ]
                 border_colors = background_colors
@@ -186,7 +190,7 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data[label_column].tolist()
+            labels = source_data.index.tolist()
             for i, col in enumerate(value_columns):
                 values = [
                     float(value.split(' ')[0]) if not pd.isna(value) else null_value
@@ -214,7 +218,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in value_columns} for provider in source_data[label_column].unique()}
+            "data": {provider: {col: f"{source_data.loc[provider, col]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
         }
 
         # Generate the HTML content for insertion
