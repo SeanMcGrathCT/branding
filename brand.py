@@ -7,7 +7,6 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
 import uuid
-import requests
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -60,14 +59,26 @@ def upload_to_firebase_storage(file_path, bucket, destination_blob_name):
 
 def load_chart_data_from_html(html_content):
     try:
-        # Extract JSON data from the HTML content
-        start = html_content.find('type="application/ld+json">') + len('type="application/ld+json">')
-        end = html_content.find('</script>', start)
-        data_json = html_content[start:end].strip()
-        data = json.loads(data_json)
+        # Locate the start and end of the JSON data within the script
+        start_marker = '<script type="application/ld+json">'
+        end_marker = '</script>'
+        
+        start = html_content.find(start_marker)
+        end = html_content.find(end_marker, start)
+
+        if start == -1 or end == -1:
+            raise ValueError("Could not find the JSON data section in the provided HTML content.")
+        
+        # Extract and clean the JSON data
+        json_data = html_content[start+len(start_marker):end].strip()
+        
+        data = json.loads(json_data)
         return data
     except json.JSONDecodeError as e:
         st.error(f"Failed to parse JSON data from HTML content: {e}")
+        return None
+    except ValueError as e:
+        st.error(e)
         return None
 
 # Radio button for creating or updating chart
@@ -94,33 +105,24 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        st.dataframe(source_data)
+        source_data = st.data_editor(source_data)
 elif action == "Update Existing Chart":
-    chart_html = st.text_area("Paste the HTML of the existing chart:")
+    chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            labels = chart_data["data"].keys()
-            datasets = chart_data["data"]
+            labels = list(chart_data["data"].values())[0].keys()
+            datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
-            measurement_unit = "Mbps"  # Assuming measurement unit is Mbps
-            y_axis_label = "Speed (Mbps)"  # Assuming Y axis label is Speed (Mbps)
-            empty_bar_text = "No data available"  # Assuming empty bar text
-            display_legend = True  # Assuming legend is displayed
-            
             # Reconstruct the source_data dataframe from the datasets
-            data_dict = {label: [] for label in labels}
-            data_dict["VPN provider"] = []
-            for provider, values in datasets.items():
-                data_dict["VPN provider"].append(provider)
-                for label, value in values.items():
-                    data_dict[label].append(float(value.split()[0]))
-            
-            source_data = pd.DataFrame(data_dict)
-            source_data.set_index("VPN provider", inplace=True)
+            label_column = "Provider"
+            data_dict = {label_column: labels}
+            for dataset in datasets:
+                data_dict[dataset["label"]] = dataset["data"]
+            source_data = pd.DataFrame(data_dict).set_index('Provider')
             st.write("Data Preview:")
-            st.dataframe(source_data)
+            source_data = st.data_editor(source_data)
 
 if source_data is not None:
     # Select the type of chart
@@ -159,9 +161,6 @@ if source_data is not None:
     # Select whether to display the legend
     display_legend = st.checkbox("Display legend", value=display_legend)
 
-    # Editable data table
-    source_data = st.experimental_data_editor(source_data)
-
     if st.button("Generate HTML"):
         datasets = []
         null_value = 0.05  # Small fixed value for null entries
@@ -171,11 +170,11 @@ if source_data is not None:
             for provider in unique_providers:
                 provider_data = source_data.loc[provider]
                 data = [
-                    provider_data[col] if pd.notna(provider_data[col]) else null_value
+                    provider_data[col] if not pd.isna(provider_data[col]) else null_value
                     for col in mapped_columns.values()
                 ]
                 background_colors = [
-                    get_provider_color(provider) if pd.notna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
                     for col in mapped_columns.values()
                 ]
                 border_colors = background_colors
@@ -190,15 +189,15 @@ if source_data is not None:
             labels = source_data.index.tolist()
             for i, col in enumerate(mapped_columns.values()):
                 values = [
-                    value if pd.notna(value) else null_value
+                    value if not pd.isna(value) else null_value
                     for value in source_data[col].tolist()
                 ]
                 background_colors = [
-                    nice_colors[i % len(nice_colors)] if pd.notna(value) else 'rgba(169, 169, 169, 0.8)'
+                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
                 border_colors = [
-                    nice_colors[i % len(nice_colors)] if pd.notna(value) else 'rgba(169, 169, 169, 0.8)'
+                    nice_colors[i % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
                 datasets.append({
