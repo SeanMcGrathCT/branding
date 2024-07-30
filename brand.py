@@ -90,7 +90,6 @@ seo_description = ""
 label_column = ""
 value_columns = []
 measurement_unit = "Mbps"
-y_axis_label = "Speed (Mbps)"
 empty_bar_text = "No data available"
 chart_size = "Full Width"
 chart_width = 805
@@ -117,7 +116,6 @@ elif action == "Update Existing Chart":
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             measurement_unit = "Mbps"  # Assuming the unit is always Mbps
-            y_axis_label = "Speed (Mbps)"
             empty_bar_text = "No data available"
             display_legend = True
             grouping_method = "Provider"
@@ -159,7 +157,7 @@ if source_data is not None:
 
     if chart_type != "Scatter Chart":
         # Input Y axis label
-        y_axis_label = st.text_input("Enter the Y axis label:", y_axis_label)
+        y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
 
         # Input text for empty bars
         empty_bar_text = st.text_input("Enter text for empty bars (e.g., 'No servers in Egypt'):", empty_bar_text)
@@ -184,12 +182,16 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if chart_type == "Scatter Chart":
             labels = []
+            x_values = []
+            y_values = []
             for provider in source_data[label_column].unique():
                 provider_data = source_data[source_data[label_column] == provider]
-                x_values = provider_data[x_column].tolist()
-                y_values = provider_data[y_column].tolist()
-                scatter_data = [{'x': x, 'y': y} for x, y in zip(x_values, y_values)]
-                background_colors = [get_provider_color(provider)] * len(scatter_data)
+                x_val = provider_data[x_column].values[0]
+                y_val = provider_data[y_column].values[0]
+                x_values.append(x_val)
+                y_values.append(y_val)
+                scatter_data = [{'x': x_val, 'y': y_val}]
+                background_colors = [get_provider_color(provider)]
                 border_colors = background_colors
                 datasets.append({
                     'label': provider,
@@ -199,6 +201,8 @@ if source_data is not None:
                     'borderWidth': 1,
                     'showLine': False
                 })
+            x_min, x_max = min(x_values), max(x_values)
+            y_min, y_max = min(y_values), max(y_values)
         elif grouping_method == "Provider":
             labels = list(value_columns)
             unique_providers = source_data[label_column].unique()
@@ -300,14 +304,18 @@ if source_data is not None:
                 }},
                 scales: {{
                     x: {{
-                        beginAtZero: true,
+                        beginAtZero: false,
+                        min: {x_min - 1},
+                        max: {x_max + 1},
                         title: {{
                             display: true,
                             text: '{x_column if chart_type == 'Scatter Chart' else ''}'
                         }}
                     }},
                     y: {{
-                        beginAtZero: true,
+                        beginAtZero: false,
+                        min: {y_min - 5},
+                        max: {y_max + 5},
                         title: {{
                             display: true,
                             text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
