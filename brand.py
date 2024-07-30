@@ -129,8 +129,11 @@ elif action == "Update Existing Chart":
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
-            source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
+            source_data = pd.DataFrame(data_dict).transpose()
+            source_data.columns = source_data.iloc[0]
+            source_data = source_data.drop(source_data.index[0])
+            source_data.reset_index(inplace=True)
+            source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
@@ -179,15 +182,15 @@ if source_data is not None:
         null_value = 0.05  # Small fixed value for null entries
         if grouping_method == "Provider":
             labels = list(value_columns)
-            unique_providers = source_data.index.unique()
+            unique_providers = source_data[label_column].unique()
             for provider in unique_providers:
-                provider_data = source_data.loc[provider]
+                provider_data = source_data[source_data[label_column] == provider]
                 data = [
-                    float(provider_data[col].split(' ')[0]) if not pd.isna(provider_data[col]) else null_value
+                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
                     for col in value_columns
                 ]
                 background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col]) else 'rgba(169, 169, 169, 0.8)'
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
                     for col in value_columns
                 ]
                 border_colors = background_colors
@@ -227,7 +230,7 @@ if source_data is not None:
             "@type": "Dataset",
             "name": seo_title,
             "description": seo_description,
-            "data": {provider: {col: f"{source_data.at[provider, col].split(' ')[0]} {measurement_unit}" for col in value_columns} for provider in source_data.index}
+            "data": {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]}" for col in value_columns} for provider in source_data[label_column]}
         }
 
         # Generate the HTML content for insertion
