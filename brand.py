@@ -35,8 +35,10 @@ nice_colors = [
 
 # Function to assign colors based on provider names
 def get_provider_color(provider_name):
-    provider_name = provider_name.lower()
-    return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+    if isinstance(provider_name, str):
+        provider_name = provider_name.lower()
+        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+    return 'rgba(75, 192, 192, 0.8)'
 
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
