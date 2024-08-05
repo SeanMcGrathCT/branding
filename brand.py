@@ -412,4 +412,7 @@ if source_data is not None:
         )
 
         # Provide the public URL of the uploaded chart
-        st.write(f"Chart has been uploaded to
+        st.write(f"Chart has been uploaded to Firebase. [View Chart]({public_url})")
+
+# Ensure to include logging for each step
+st.write("Log:")
