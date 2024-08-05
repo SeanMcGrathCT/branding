@@ -108,7 +108,9 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data.columns = ["VPN provider"] + source_data.columns.tolist()[1:]
+        # Ensure unique column names
+        unique_columns = ["VPN provider"] + [f"{col}_{i}" for i, col in enumerate(source_data.columns.tolist()[1:], start=1)]
+        source_data.columns = unique_columns
         source_data = st.data_editor(source_data)
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
