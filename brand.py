@@ -230,6 +230,7 @@ if source_data is not None:
                 data = [
                     float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
                     for col in value_columns
+                    if pd.api.types.is_numeric_dtype(source_data[col])
                 ]
                 background_colors = get_provider_color(provider)
                 border_colors = background_colors
@@ -248,6 +249,7 @@ if source_data is not None:
                 data = [
                     float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
                     for col in value_columns
+                    if pd.api.types.is_numeric_dtype(source_data[col])
                 ]
                 background_colors = [
                     get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
@@ -268,6 +270,7 @@ if source_data is not None:
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
                     for value in source_data[col].tolist()
+                    if pd.api.types.is_numeric_dtype(source_data[col])
                 ]
                 background_colors = [
                     nice_colors[color_index % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
