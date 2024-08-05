@@ -110,9 +110,6 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        # Ensure unique column names
-        unique_columns = ["VPN provider"] + [f"{col}_{i}" for i, col in enumerate(source_data.columns.tolist()[1:], start=1)]
-        source_data.columns = unique_columns
         source_data = st.data_editor(source_data)
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
@@ -135,11 +132,7 @@ elif action == "Update Existing Chart":
             data_dict = {label_column: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict).transpose()
-            source_data.columns = source_data.iloc[0]
-            source_data = source_data.drop(source_data.index[0])
-            source_data.reset_index(inplace=True)
-            source_data.rename(columns={'index': 'VPN provider'}, inplace=True)
+            source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
