@@ -333,7 +333,7 @@ if source_data is not None:
                                 if (context.raw <= {null_value * 1.1}) {{
                                     return '{empty_bar_text}';
                                 }}
-                                if ('x' in context.raw && 'y' in context.raw) {{
+                                if (context.raw && context.raw.x !== undefined && context.raw.y !== undefined) {{
                                     return context.dataset.label + ': (' + context.raw.x + ', ' + context.raw.y + ')';
                                 }}
                                 return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
