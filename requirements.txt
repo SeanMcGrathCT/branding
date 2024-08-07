@@ -6,3 +6,4 @@ cairocffi
 lxml
 firebase-admin
 gspread
+oauth2client
