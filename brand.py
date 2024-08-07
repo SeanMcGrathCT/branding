@@ -93,7 +93,7 @@ def load_chart_data_from_html(html_content):
 
 # Google Sheets authorization
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('gsheet.json', scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["GCP_SERVICE_ACCOUNT"], scope)
 client = gspread.authorize(creds)
 
 # Load the Google Sheets document by URL
@@ -117,7 +117,7 @@ def move_sitewide_testing_columns(df, sitewide_testing_columns):
     cols = df.columns.tolist()
     provider_col = ['Provider']
     sitewide_cols = [col for col in cols if col in sitewide_testing_columns]
-    other_cols = [col for col in cols not in sitewide_testing_columns and col != 'Provider']
+    other_cols = [col for col in cols if col not in sitewide_testing_columns and col != 'Provider']
     return df[provider_col + sitewide_cols + other_cols]
 
 def move_overall_score_to_end(df):
