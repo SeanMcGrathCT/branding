@@ -298,7 +298,14 @@ elif action == "Check URL":
         st.write(f"Scraped Scores: {scraped_scores}")
 
         filtered_data = consolidated_df[consolidated_df['Article URL'].str.contains(url, case=False, na=False)]
-        st.write(f"Filtered data: {filtered_data}")
+        
+        # Debug statement to ensure filtered_data is correct
+        st.write("Filtered data preview:", filtered_data.head())
+        st.write("Columns in filtered data:", filtered_data.columns.tolist())
+
+        if 'Parent Category' not in filtered_data.columns or 'Data Point Name' not in filtered_data.columns:
+            st.error("Required columns are missing in the filtered data.")
+            st.stop()
 
         sitewide_testing_columns = filtered_data[filtered_data['Parent Category'].str.contains('sitewide testing', case=False, na=False)]['Data Point Name'].unique()
         st.write(f"Sitewide testing columns: {sitewide_testing_columns}")
