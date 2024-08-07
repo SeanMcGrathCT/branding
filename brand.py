@@ -11,6 +11,11 @@ import requests
 from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from gspread.exceptions import APIError
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -98,11 +103,14 @@ client = gspread.authorize(creds)
 
 # Load the Google Sheets document by URL
 spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q/edit?usp=sharing'
-spreadsheet = client.open_by_url(spreadsheet_url)
 
-# Load the sheets into dataframes
-articles_df = pd.DataFrame(spreadsheet.worksheet('Master').get_all_records())
-consolidated_df = pd.DataFrame(spreadsheet.worksheet('Consolidated').get_all_records())
+try:
+    spreadsheet = client.open_by_url(spreadsheet_url)
+    articles_df = pd.DataFrame(spreadsheet.worksheet('Master').get_all_records())
+    consolidated_df = pd.DataFrame(spreadsheet.worksheet('Consolidated').get_all_records())
+except APIError as e:
+    st.error(f"An error occurred while accessing the Google Sheets API: {e}")
+    st.stop()
 
 # Radio button for creating, updating chart, or checking URL
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart", "Check URL"], key='action_choice')
@@ -193,8 +201,12 @@ def load_mappings():
         return {}
 
 def save_mappings(mappings):
-    with open('mappings.json', 'w') as file:
-        json.dump(mappings, file)
+    try:
+        with open('mappings.json', 'w') as file:
+            json.dump(mappings, file)
+        st.success("Mappings saved successfully")
+    except Exception as e:
+        st.error(f"Failed to save mappings: {e}")
 
 def create_mapping_ui(scraped_scores, google_sheets_scores):
     mappings = load_mappings()
@@ -209,7 +221,6 @@ def create_mapping_ui(scraped_scores, google_sheets_scores):
     if st.button("Save Mappings"):
         mappings.update(new_mappings)
         save_mappings(mappings)
-        st.success("Mappings saved successfully")
         st.experimental_rerun()  # Rerun the script to apply new mappings
 
 def compare_scores(scraped_scores, filtered_data):
