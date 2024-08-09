@@ -246,27 +246,31 @@ def compare_scores(scraped_scores, filtered_data):
                             mismatches[provider].append((score_name, scraped_score, gs_score_value))
     return mismatches
 
-# Initialize variables for form fields
-seo_title = ""
-seo_description = ""
-label_column = ""
-value_columns = []
-measurement_unit = "Mbps"
-empty_bar_text = "No data available"
-chart_size = "Full Width"
-chart_width = 805
-chart_height = 600
-grouping_method = "Provider"
-display_legend = True
-source_data = None
+# Initialize variables for form fields in session state
+if "form_fields" not in st.session_state:
+    st.session_state.form_fields = {
+        "seo_title": "",
+        "seo_description": "",
+        "label_column": "",
+        "value_columns": [],
+        "measurement_unit": "Mbps",
+        "empty_bar_text": "No data available",
+        "chart_size": "Full Width",
+        "chart_width": 805,
+        "chart_height": 600,
+        "grouping_method": "Provider",
+        "display_legend": True,
+        "source_data": None,
+        "chart_type": "Single Bar Chart"
+    }
 
 if action == "Create New Chart":
     # Upload CSV file
     uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv")
     if uploaded_file is not None:
-        source_data = pd.read_csv(uploaded_file)
+        st.session_state.form_fields["source_data"] = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data = st.data_editor(source_data)
+        st.session_state.form_fields["source_data"] = st.data_editor(st.session_state.form_fields["source_data"])
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
@@ -274,23 +278,23 @@ elif action == "Update Existing Chart":
         if chart_data:
             labels = list(chart_data["data"].values())[0].keys()
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
-            seo_title = chart_data.get("name", "")
-            seo_description = chart_data.get("description", "")
-            measurement_unit = "Mbps"  # Assuming the unit is always Mbps
-            empty_bar_text = "No data available"
-            display_legend = True
-            grouping_method = "Provider"
-            chart_size = "Full Width"
-            chart_width = 805
-            chart_height = 600
+            st.session_state.form_fields["seo_title"] = chart_data.get("name", "")
+            st.session_state.form_fields["seo_description"] = chart_data.get("description", "")
+            st.session_state.form_fields["measurement_unit"] = "Mbps"  # Assuming the unit is always Mbps
+            st.session_state.form_fields["empty_bar_text"] = "No data available"
+            st.session_state.form_fields["display_legend"] = True
+            st.session_state.form_fields["grouping_method"] = "Provider"
+            st.session_state.form_fields["chart_size"] = "Full Width"
+            st.session_state.form_fields["chart_width"] = 805
+            st.session_state.form_fields["chart_height"] = 600
             # Reconstruct the source_data dataframe from the datasets
-            label_column = "VPN provider"
-            data_dict = {label_column: labels}
+            st.session_state.form_fields["label_column"] = "VPN provider"
+            data_dict = {st.session_state.form_fields["label_column"]: labels}
             for dataset in datasets:
                 data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
+            st.session_state.form_fields["source_data"] = pd.DataFrame(data_dict)
             st.write("Data Preview:")
-            source_data = st.data_editor(source_data)
+            st.session_state.form_fields["source_data"] = st.data_editor(st.session_state.form_fields["source_data"])
 elif action == "Check URL":
     url = st.text_input("Enter the URL of the page:")
     if url:
@@ -301,7 +305,7 @@ elif action == "Check URL":
         
         # Debug statement to ensure filtered_data is correct
         st.write("Filtered data preview:", filtered_data.head())
-        st.write("Columns in filtered data:", filtered_data.columns.tolist())
+        st.write("Columns in filtered_data:", filtered_data.columns.tolist())
 
         if 'Parent Category' not in filtered_data.columns or 'Data Point Name' not in filtered_data.columns:
             st.error("Required columns are missing in the filtered data.")
@@ -364,75 +368,117 @@ elif action == "Check URL":
                         mime='text/csv'
                     )
                     if st.button("Create Graph", key=f"{parent_category}_graph"):
-                        source_data = pivoted_data  # Use this data for chart creation below
+                        st.session_state.form_fields["source_data"] = pivoted_data  # Use this data for chart creation below
                 except ValueError as e:
                     st.write(f"Error processing category {parent_category}: {e}")
         else:
             st.write("No data found for the specified URL.")
 
-if source_data is not None:
+if st.session_state.form_fields["source_data"] is not None:
     # Select the type of chart
-    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
+    st.session_state.form_fields["chart_type"] = st.selectbox(
+        "Select the type of chart:",
+        ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"],
+        key='chart_type',
+        index=["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"].index(st.session_state.form_fields["chart_type"])
+    )
 
     # Select the columns for the chart
-    if not source_data.empty:
-        label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
+    if not st.session_state.form_fields["source_data"].empty:
+        st.session_state.form_fields["label_column"] = st.selectbox(
+            "Select the column for VPN providers:",
+            st.session_state.form_fields["source_data"].columns,
+            key='label_column'
+        )
+
         # Ensure the default value columns are valid columns in the dataframe
-        valid_columns = list(source_data.columns)
+        valid_columns = list(st.session_state.form_fields["source_data"].columns)
         default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
-        if chart_type == "Scatter Chart":
-            x_column = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
-            y_column = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
+        if st.session_state.form_fields["chart_type"] == "Scatter Chart":
+            st.session_state.form_fields["x_column"] = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
+            st.session_state.form_fields["y_column"] = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
         else:
-            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
+            st.session_state.form_fields["value_columns"] = st.multiselect(
+                "Select the columns for tests:",
+                valid_columns,
+                default=default_columns,
+                key='value_columns'
+            )
 
     # Input SEO title and description
-    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
-    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
+    st.session_state.form_fields["seo_title"] = st.text_input(
+        "Enter the SEO title for the chart:",
+        st.session_state.form_fields["seo_title"]
+    )
+    st.session_state.form_fields["seo_description"] = st.text_area(
+        "Enter the SEO description for the chart:",
+        st.session_state.form_fields["seo_description"]
+    )
 
-    if chart_type != "Scatter Chart":
+    if st.session_state.form_fields["chart_type"] != "Scatter Chart":
         # Input Y axis label
-        y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
+        st.session_state.form_fields["y_axis_label"] = st.text_input(
+            "Enter the Y axis label:",
+            "Speed (Mbps)"
+        )
 
     # Input measurement unit
-    measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit)
+    st.session_state.form_fields["measurement_unit"] = st.text_input(
+        "Enter the measurement unit:",
+        st.session_state.form_fields["measurement_unit"]
+    )
 
     # Input text for empty bar tooltip
-    empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text)
+    st.session_state.form_fields["empty_bar_text"] = st.text_input(
+        "Enter the text for empty bar tooltips:",
+        st.session_state.form_fields["empty_bar_text"]
+    )
 
     # Select chart size
-    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
-    if chart_size == "Full Width":
-        chart_width = 805
-        chart_height = 600
-    elif chart_size == "Medium":
-        chart_width = 605
-        chart_height = 500
+    st.session_state.form_fields["chart_size"] = st.selectbox(
+        "Select the chart size:",
+        ["Full Width", "Medium", "Small"],
+        index=["Full Width", "Medium", "Small"].index(st.session_state.form_fields["chart_size"])
+    )
+
+    if st.session_state.form_fields["chart_size"] == "Full Width":
+        st.session_state.form_fields["chart_width"] = 805
+        st.session_state.form_fields["chart_height"] = 600
+    elif st.session_state.form_fields["chart_size"] == "Medium":
+        st.session_state.form_fields["chart_width"] = 605
+        st.session_state.form_fields["chart_height"] = 500
     else:
-        chart_width = 405
-        chart_height = 400
+        st.session_state.form_fields["chart_width"] = 405
+        st.session_state.form_fields["chart_height"] = 400
 
     # Grouping method for bar charts
-    if chart_type == "Grouped Bar Chart":
-        grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
+    if st.session_state.form_fields["chart_type"] == "Grouped Bar Chart":
+        st.session_state.form_fields["grouping_method"] = st.selectbox(
+            "Group by Provider or Test Type:",
+            ["Provider", "Test Type"],
+            key='grouping_method'
+        )
     else:
-        grouping_method = "Provider"
+        st.session_state.form_fields["grouping_method"] = "Provider"
 
     # Display legend
-    display_legend = st.checkbox("Display legend", value=display_legend)
+    st.session_state.form_fields["display_legend"] = st.checkbox(
+        "Display legend",
+        value=st.session_state.form_fields["display_legend"]
+    )
 
     if st.button("Generate HTML"):
         datasets = []
         null_value = 0.05  # Small fixed value for null entries
-        if chart_type == "Scatter Chart":
+        if st.session_state.form_fields["chart_type"] == "Scatter Chart":
             labels = []
             x_values = []
             y_values = []
-            for provider in source_data[label_column].unique():
-                provider_data = source_data[source_data[label_column] == provider]
+            for provider in st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]].unique():
+                provider_data = st.session_state.form_fields["source_data"][st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]] == provider]
                 try:
-                    x_val = float(provider_data[x_column].values[0])
-                    y_val = float(provider_data[y_column].values[0])
+                    x_val = float(provider_data[st.session_state.form_fields["x_column"]].values[0])
+                    y_val = float(provider_data[st.session_state.form_fields["y_column"]].values[0])
                     x_values.append(x_val)
                     y_values.append(y_val)
                     scatter_data = [{'x': x_val, 'y': y_val}]
@@ -452,14 +498,14 @@ if source_data is not None:
             if x_values and y_values:
                 x_min, x_max = min(x_values), max(x_values)
                 y_min, y_max = min(y_values), max(y_values)
-        elif chart_type == "Radar Chart":
-            labels = value_columns
-            for provider in source_data[label_column].unique():
-                provider_data = source_data[source_data[label_column] == provider]
+        elif st.session_state.form_fields["chart_type"] == "Radar Chart":
+            labels = st.session_state.form_fields["value_columns"]
+            for provider in st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]].unique():
+                provider_data = st.session_state.form_fields["source_data"][st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]] == provider]
                 data = [
                     float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
-                    for col in value_columns
-                    if pd.api.types.is_numeric_dtype(source_data[col])
+                    for col in st.session_state.form_fields["value_columns"]
+                    if pd.api.types.is_numeric_dtype(st.session_state.form_fields["source_data"][col])
                 ]
                 background_colors = get_provider_color(provider)
                 border_colors = background_colors
@@ -470,19 +516,19 @@ if source_data is not None:
                     'borderColor': border_colors,
                     'borderWidth': 1
                 })
-        elif grouping_method == "Provider":
-            labels = list(value_columns)
-            unique_providers = source_data[label_column].unique()
+        elif st.session_state.form_fields["grouping_method"] == "Provider":
+            labels = list(st.session_state.form_fields["value_columns"])
+            unique_providers = st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]].unique()
             for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
+                provider_data = st.session_state.form_fields["source_data"][st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]] == provider]
                 data = [
                     float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
-                    for col in value_columns
-                    if pd.api.types.is_numeric_dtype(source_data[col])
+                    for col in st.session_state.form_fields["value_columns"]
+                    if pd.api.types.is_numeric_dtype(st.session_state.form_fields["source_data"][col])
                 ]
                 background_colors = [
                     get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
-                    for col in value_columns
+                    for col in st.session_state.form_fields["value_columns"]
                 ]
                 border_colors = background_colors
                 datasets.append({
@@ -493,13 +539,13 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:  # Group by Test Type
-            labels = source_data[label_column].tolist()
+            labels = st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]].tolist()
             color_index = 0
-            for col in value_columns:
+            for col in st.session_state.form_fields["value_columns"]:
                 values = [
                     float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
-                    for value in source_data[col].tolist()
-                    if pd.api.types.is_numeric_dtype(source_data[col])
+                    for value in st.session_state.form_fields["source_data"][col].tolist()
+                    if pd.api.types.is_numeric_dtype(st.session_state.form_fields["source_data"][col])
                 ]
                 background_colors = [
                     nice_colors[color_index % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
@@ -516,26 +562,26 @@ if source_data is not None:
                 color_index += 1
 
         # Generate ld+json metadata
-        if chart_type == "Scatter Chart":
-            data_dict = {provider: {x_column: provider_data[x_column].tolist(), y_column: provider_data[y_column].tolist()} for provider in source_data[label_column].unique()}
-        elif chart_type == "Radar Chart":
-            data_dict = {provider: {col: f"{provider_data.at[provider_data.index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider, provider_data in source_data.groupby(label_column)}
+        if st.session_state.form_fields["chart_type"] == "Scatter Chart":
+            data_dict = {provider: {st.session_state.form_fields["x_column"]: provider_data[st.session_state.form_fields["x_column"]].tolist(), st.session_state.form_fields["y_column"]: provider_data[st.session_state.form_fields["y_column"]].tolist()} for provider in st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]].unique()}
+        elif st.session_state.form_fields["chart_type"] == "Radar Chart":
+            data_dict = {provider: {col: f"{provider_data.at[provider_data.index[0], col]} {st.session_state.form_fields['measurement_unit']}".split(' ')[0] + ' ' + st.session_state.form_fields["measurement_unit"] for col in st.session_state.form_fields["value_columns"]} for provider, provider_data in st.session_state.form_fields["source_data"].groupby(st.session_state.form_fields["label_column"])}
         else:
-            data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
-        
+            data_dict = {provider: {col: f"{st.session_state.form_fields['source_data'].at[st.session_state.form_fields['source_data'][st.session_state.form_fields['label_column']] == provider].index[0], col]} {st.session_state.form_fields['measurement_unit']}".split(' ')[0] + ' ' + st.session_state.form_fields["measurement_unit"] for col in st.session_state.form_fields["value_columns"]} for provider in st.session_state.form_fields["source_data"][st.session_state.form_fields["label_column"]]}
+
         metadata = {
             "@context": "http://schema.org",
             "@type": "Dataset",
-            "name": seo_title,
-            "description": seo_description,
+            "name": st.session_state.form_fields["seo_title"],
+            "description": st.session_state.form_fields["seo_description"],
             "data": data_dict
         }
 
         # Generate the HTML content for insertion
-        unique_id = generate_unique_id(seo_title)
+        unique_id = generate_unique_id(st.session_state.form_fields["seo_title"])
         html_content = f"""
-<div id="{unique_id}" style="max-width: {chart_width}px; margin: 0 auto;">
-    <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id}" width="{chart_width}" height="{chart_height}"></canvas>
+<div id="{unique_id}" style="max-width: {st.session_state.form_fields['chart_width']}px; margin: 0 auto;">
+    <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id}" width="{st.session_state.form_fields['chart_width']}" height="{st.session_state.form_fields['chart_height']}"></canvas>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 <script>
@@ -543,7 +589,7 @@ if source_data is not None:
         var ctx = document.getElementById('vpnSpeedChart_{unique_id}').getContext('2d');
         
         var vpnSpeedChart = new Chart(ctx, {{
-            type: '{'radar' if chart_type == 'Radar Chart' else 'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
+            type: '{'radar' if st.session_state.form_fields['chart_type'] == 'Radar Chart' else 'scatter' if st.session_state.form_fields['chart_type'] == 'Scatter Chart' else 'bar'}',
             data: {{
                 labels: {json.dumps(labels)},
                 datasets: {json.dumps(datasets, default=str)}
@@ -553,45 +599,45 @@ if source_data is not None:
                 plugins: {{
                     title: {{
                         display: true,
-                        text: '{seo_title}',
+                        text: '{st.session_state.form_fields["seo_title"]}',
                         font: {{
                             size: 18
                         }}
                     }},
                     legend: {{
-                        display: {str(display_legend).lower()}
+                        display: {str(st.session_state.form_fields["display_legend"]).lower()}
                     }},
                     tooltip: {{
                         callbacks: {{
                             label: function(context) {{
                                 if (context.raw <= {null_value * 1.1}) {{
-                                    return '{empty_bar_text}';
+                                    return '{st.session_state.form_fields["empty_bar_text"]}';
                                 }}
                                 if (context.raw && context.raw.x !== undefined && context.raw.y !== undefined) {{
                                     return context.dataset.label + ': (' + context.raw.x + ', ' + context.raw.y + ')';
                                 }}
-                                return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
+                                return context.dataset.label + ': ' + context.raw + ' {st.session_state.form_fields["measurement_unit"]}';
                             }}
                         }}
                     }}
                 }},
                 scales: {{
                     x: {{
-                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {(x_min - 1) if chart_type == 'Scatter Chart' else 'null'},
-                        max: {(x_max + 1) if chart_type == 'Scatter Chart' else 'null'},
+                        beginAtZero: {str(st.session_state.form_fields['chart_type'] != 'Radar Chart').lower()},
+                        min: {(x_min - 1) if st.session_state.form_fields['chart_type'] == 'Scatter Chart' else 'null'},
+                        max: {(x_max + 1) if st.session_state.form_fields['chart_type'] == 'Scatter Chart' else 'null'},
                         title: {{
                             display: true,
-                            text: '{x_column if chart_type == 'Scatter Chart' else ''}'
+                            text: '{st.session_state.form_fields["x_column"] if st.session_state.form_fields['chart_type'] == 'Scatter Chart' else ''}'
                         }}
                     }},
                     y: {{
-                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {(y_min - 5) if chart_type == 'Scatter Chart' else 'null'},
-                        max: {(y_max + 5) if chart_type == 'Scatter Chart' else 'null'},
+                        beginAtZero: {str(st.session_state.form_fields['chart_type'] != 'Radar Chart').lower()},
+                        min: {(y_min - 5) if st.session_state.form_fields['chart_type'] == 'Scatter Chart' else 'null'},
+                        max: {(y_max + 5) if st.session_state.form_fields['chart_type'] == 'Scatter Chart' else 'null'},
                         title: {{
                             display: true,
-                            text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
+                            text: '{st.session_state.form_fields["y_column"] if st.session_state.form_fields['chart_type'] == 'Scatter Chart' else st.session_state.form_fields["y_axis_label"]}'
                         }}
                     }}
                 }}
@@ -624,8 +670,8 @@ if source_data is not None:
         log_data = [
             unique_id,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            seo_title,
-            seo_description,
+            st.session_state.form_fields["seo_title"],
+            st.session_state.form_fields["seo_description"],
             public_url
         ]
 
