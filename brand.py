@@ -163,6 +163,9 @@ if source_data is not None:
 
     display_legend = st.checkbox("Display legend", value=display_legend)
 
+    # Choice between standalone and production HTML
+    html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0)
+
     if st.button("Generate HTML"):
         datasets = []
         null_value = 0.05  
@@ -264,7 +267,13 @@ if source_data is not None:
 <div id="{unique_id}" style="max-width: {chart_width}px; margin: 0 auto;">
     <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id}" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
+"""
+        if html_type == "Standalone":
+            html_content += f"""
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+"""
+
+        html_content += f"""
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
         var ctx = document.getElementById('vpnSpeedChart_{unique_id}').getContext('2d');
