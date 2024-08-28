@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
+import re
+import random
 
 # Define VPN colors with less transparency for a more defined look
 vpn_colors = {
@@ -134,14 +136,19 @@ if uploaded_file is not None:
             "data": {provider: {col: f"{source_data.loc[source_data[label_column] == provider, col].values[0]} {measurement_unit}" for col in mapped_columns.values()} for provider in source_data[label_column].unique()}
         }
 
+        # Convert the title to an ID-friendly format and add random digits
+        title_id = re.sub(r'\s+', '_', seo_title.lower())
+        random_digits = random.randint(1000, 9999)
+        chart_id = f"{title_id}_{random_digits}"
+
         # Generate the HTML content for insertion
         html_content = f"""
 <div style="max-width: {chart_width}px; margin: 0 auto;">
-    <canvas class="jschartgraphic" id="vpnSpeedChart" width="{chart_width}" height="{chart_height}"></canvas>
+    <canvas class="jschartgraphic" id="{chart_id}" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('vpnSpeedChart').getContext('2d');
+        var ctx = document.getElementById('{chart_id}').getContext('2d');
         
         var vpnSpeedChart = new Chart(ctx, {{
             type: 'bar',
