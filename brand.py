@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
+import re
+import random
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
@@ -12,7 +14,7 @@ vpn_colors = {
     'surfshark': 'rgba(30, 191, 191, 0.8)',
     'expressvpn': 'rgba(218, 57, 64, 0.8)',
     'ipvanish': 'rgba(112, 187, 68, 0.8)',
-    'cyberghost': 'rgba(255, 204, 0.8)',
+    'cyberghost': 'rgba(255, 204, 0, 0.8)',
     'purevpn': 'rgba(133, 102, 231, 0.8)',
     'protonvpn': 'rgba(109, 74, 255, 0.8)',
     'privatevpn': 'rgba(159, 97, 185, 0.8)',
@@ -42,24 +44,32 @@ def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
     return unique_id
 
+# Function to generate ld+json metadata
+def generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit):
+    data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
+    
+    metadata = {
+        "@context": "http://schema.org",
+        "@type": "Dataset",
+        "name": seo_title,
+        "description": seo_description,
+        "data": data_dict
+    }
+    return metadata
+
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
 
 def load_chart_data_from_html(html_content):
     try:
-        # Locate the start and end of the JSON data within the script
         start_marker = '<script type="application/ld+json">'
         end_marker = '</script>'
-        
         start = html_content.find(start_marker)
         end = html_content.find(end_marker, start)
-
         if start == -1 or end == -1:
             raise ValueError("Could not find the JSON data section in the provided HTML content.")
         
-        # Extract and clean the JSON data
         json_data = html_content[start+len(start_marker):end].strip()
-        
         data = json.loads(json_data)
         return data
     except json.JSONDecodeError as e:
@@ -87,7 +97,6 @@ display_legend = True
 source_data = None
 
 if action == "Create New Chart":
-    # Upload CSV file
     uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv")
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
@@ -102,14 +111,13 @@ elif action == "Update Existing Chart":
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
-            measurement_unit = "Mbps"  # Assuming the unit is always Mbps
+            measurement_unit = "Mbps"
             empty_bar_text = "No data available"
             display_legend = True
             grouping_method = "Provider"
             chart_size = "Full Width"
             chart_width = 805
             chart_height = 600
-            # Reconstruct the source_data dataframe from the datasets
             label_column = "VPN provider"
             data_dict = {label_column: labels}
             for dataset in datasets:
@@ -119,13 +127,10 @@ elif action == "Update Existing Chart":
             source_data = st.data_editor(source_data)
 
 if source_data is not None:
-    # Select the type of chart
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
-
-    # Select the columns for the chart
+    
     if not source_data.empty:
         label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-        # Ensure the default value columns are valid columns in the dataframe
         valid_columns = list(source_data.columns)
         default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
         if chart_type == "Scatter Chart":
@@ -134,21 +139,13 @@ if source_data is not None:
         else:
             value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
-    # Input SEO title and description
     seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
     seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
 
     if chart_type != "Scatter Chart":
-        # Input Y axis label
         y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
-
-    # Input measurement unit
     measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit)
-
-    # Input text for empty bar tooltip
     empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text)
-
-    # Select chart size
     chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
     if chart_size == "Full Width":
         chart_width = 805
@@ -159,19 +156,16 @@ if source_data is not None:
     else:
         chart_width = 405
         chart_height = 400
-
-    # Grouping method for bar charts
     if chart_type == "Grouped Bar Chart":
         grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
     else:
         grouping_method = "Provider"
 
-    # Display legend
     display_legend = st.checkbox("Display legend", value=display_legend)
 
     if st.button("Generate HTML"):
         datasets = []
-        null_value = 0.05  # Small fixed value for null entries
+        null_value = 0.05  
         if chart_type == "Scatter Chart":
             labels = []
             x_values = []
@@ -240,7 +234,7 @@ if source_data is not None:
                     'borderColor': border_colors,
                     'borderWidth': 1
                 })
-        else:  # Group by Test Type
+        else:
             labels = source_data[label_column].tolist()
             color_index = 0
             for col in value_columns:
@@ -263,23 +257,8 @@ if source_data is not None:
                 })
                 color_index += 1
 
-        # Generate ld+json metadata
-        if chart_type == "Scatter Chart":
-            data_dict = {provider: {x_column: provider_data[x_column].tolist(), y_column: provider_data[y_column].tolist()} for provider in source_data[label_column].unique()}
-        elif chart_type == "Radar Chart":
-            data_dict = {provider: {col: f"{provider_data.at[provider_data.index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider, provider_data in source_data.groupby(label_column)}
-        else:
-            data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
-        
-        metadata = {
-            "@context": "http://schema.org",
-            "@type": "Dataset",
-            "name": seo_title,
-            "description": seo_description,
-            "data": data_dict
-        }
+        metadata = generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit)
 
-        # Generate the HTML content for insertion
         unique_id = generate_unique_id(seo_title)
         html_content = f"""
 <div id="{unique_id}" style="max-width: {chart_width}px; margin: 0 auto;">
@@ -352,12 +331,10 @@ if source_data is not None:
 </script>
 """
 
-        # Save the HTML content to a file
         html_file_path = f"{unique_id}.html"
         with open(html_file_path, "w") as html_file:
             html_file.write(html_content)
 
-        # Display download button for the HTML content
         st.download_button(
             label="Download HTML",
             data=html_content,
@@ -365,14 +342,12 @@ if source_data is not None:
             mime="text/html"
         )
 
-        # Log the upload to Google Sheets
         google_credentials = service_account.Credentials.from_service_account_info(
             dict(st.secrets["GCP_SERVICE_ACCOUNT"])
         )
         service = build('sheets', 'v4', credentials=google_credentials)
         sheet = service.spreadsheets()
 
-        # Prepare the data to be logged
         log_data = [
             unique_id,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -380,7 +355,6 @@ if source_data is not None:
             seo_description
         ]
 
-        # Append the data to the Google Sheets
         sheet.values().append(
             spreadsheetId="1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q",
             range="charts!A:D",
@@ -388,6 +362,4 @@ if source_data is not None:
             body={"values": [log_data]}
         ).execute()
 
-# Ensure to include logging for each step
 st.write("Log:")
-
