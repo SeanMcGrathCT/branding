@@ -19,14 +19,12 @@ vpn_colors = {
     'strongvpn': 'rgba(238, 170, 29, 0.8)'
 }
 
-# Function to assign colors based on provider names
 def get_provider_color(provider_name):
     if isinstance(provider_name, str):
         provider_name = provider_name.lower()
         return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
     return 'rgba(75, 192, 192, 0.8)'
 
-# Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
         background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
@@ -43,12 +41,10 @@ def extract_colors_from_html(html_content):
         st.error(f"Failed to extract colors from HTML: {e}")
         return [], []
 
-# Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
     return unique_id
 
-# Function to generate ld+json metadata
 def generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit):
     data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
     
@@ -61,7 +57,6 @@ def generate_metadata(seo_title, seo_description, source_data, label_column, val
     }
     return metadata
 
-# Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
 
 def load_chart_data_from_html(html_content):
@@ -83,10 +78,9 @@ def load_chart_data_from_html(html_content):
         st.error(e)
         return None
 
-# Radio button for creating or updating chart
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_choice')
 
-# Initialize variables for form fields
+# Initialize variables
 seo_title = ""
 seo_description = ""
 label_column = ""
@@ -110,22 +104,19 @@ elif action == "Update Existing Chart":
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            labels = list(chart_data["data"].keys())  # Correctly extract labels as a list
+            labels = list(chart_data["data"].keys())  
             datasets = []
 
-            # Extract colors from existing HTML
+            # Extract colors from HTML
             background_colors, border_colors = extract_colors_from_html(chart_html)
-            
             st.write("Extracted Background Colors:", background_colors)
             st.write("Extracted Border Colors:", border_colors)
-            
-            # Loop through the data to extract values and apply color logic
+
+            # Extract data and apply color logic
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
-                
                 bg_colors = background_colors if background_colors else [get_provider_color(k)] * len(data_values)
                 br_colors = border_colors if border_colors else bg_colors
-                
                 datasets.append({
                     "label": k,
                     "data": data_values,
@@ -136,19 +127,11 @@ elif action == "Update Existing Chart":
 
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
-            measurement_unit = "Mbps"
-            empty_bar_text = "No data available"
-            display_legend = True
-            chart_size = "Full Width"
-            chart_width = 805
-            chart_height = 600
             label_column = "VPN provider"
-            
-            # Ensure all columns have equal lengths
             max_len = max(len(d["data"]) for d in datasets)
-            data_dict = {label_column: labels[:max_len]}  # Truncate to ensure equal length
+            data_dict = {label_column: labels[:max_len]}  
             for dataset in datasets:
-                data_dict[dataset["label"]] = dataset["data"][:max_len]  # Truncate data if necessary
+                data_dict[dataset["label"]] = dataset["data"][:max_len]  
 
             source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
@@ -156,42 +139,23 @@ elif action == "Update Existing Chart":
 
 if source_data is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
-    
+
     if not source_data.empty:
         label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
         valid_columns = list(source_data.columns)
-        default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
-        if chart_type == "Scatter Chart":
-            x_column = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
-            y_column = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
-        else:
-            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
+        if chart_type != "Scatter Chart":
+            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=valid_columns[1:], key='value_columns')
 
     seo_title = st.text_input("Enter the SEO title for the chart:", seo_title, key='seo_title')
     seo_description = st.text_area("Enter the SEO description for the chart:", seo_description, key='seo_description')
 
     if chart_type != "Scatter Chart":
         y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)", key='y_axis_label')
-    measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit, key='measurement_unit')
-    empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text, key='empty_bar_text')
-    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"], key='chart_size')
-    if chart_size == "Full Width":
-        chart_width = 805
-        chart_height = 600
-    elif chart_size == "Medium":
-        chart_width = 605
-        chart_height = 500
-    else:
-        chart_width = 405
-        chart_height = 400
-
-
+    
     display_legend = st.checkbox("Display legend", value=True, key='display_legend')
 
     if st.button("Generate HTML"):
         datasets = []
-        null_value = 0.05  
-        
         if chart_type == "Grouped Bar Chart":
             labels = list(value_columns)
             for provider in source_data[label_column].unique():
@@ -209,11 +173,6 @@ if source_data is not None:
                     'borderColor': border_colors,
                     'borderWidth': 1
                 })
-        else:
-            pass  # Handle other chart types
-
-        st.write("Generated Background Colors:", background_colors)
-        st.write("Generated Border Colors:", border_colors)
 
         unique_id_safe = generate_unique_id(seo_title)
         metadata = generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit)
@@ -222,7 +181,6 @@ if source_data is not None:
 <div id="{unique_id_safe}" style="max-width: {chart_width}px; margin: 0 auto;">
     <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id_safe}" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
@@ -263,3 +221,4 @@ if source_data is not None:
 </script>
 """
         st.download_button("Download HTML", data=html_content, file_name=f"{unique_id_safe}.html", mime="text/html")
+
