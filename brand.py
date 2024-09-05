@@ -260,12 +260,16 @@ if source_data is not None:
                 })
                 color_index += 1
 
-        metadata = generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit)
+        # Escape single quotes in seo_title and unique_id
+        seo_title_escaped = seo_title.replace("'", "\\'")
+        unique_id_escaped = unique_id.replace("'", "\\'")
+
+        metadata = generate_metadata(seo_title_escaped, seo_description, source_data, label_column, value_columns, measurement_unit)
 
         unique_id = generate_unique_id(seo_title)
         html_content = f"""
-<div id="{unique_id}" style="max-width: {chart_width}px; margin: 0 auto;">
-    <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id}" width="{chart_width}" height="{chart_height}"></canvas>
+<div id="{unique_id_escaped}" style="max-width: {chart_width}px; margin: 0 auto;">
+    <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id_escaped}" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
 """
         if html_type == "Standalone":
@@ -276,7 +280,7 @@ if source_data is not None:
         html_content += f"""
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('vpnSpeedChart_{unique_id}').getContext('2d');
+        var ctx = document.getElementById('vpnSpeedChart_{unique_id_escaped}').getContext('2d');
         
         var vpnSpeedChart = new Chart(ctx, {{
             type: '{'radar' if chart_type == 'Radar Chart' else 'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
@@ -289,7 +293,7 @@ if source_data is not None:
                 plugins: {{
                     title: {{
                         display: true,
-                        text: '{seo_title}',
+                        text: '{seo_title_escaped}',
                         font: {{
                             size: 18
                         }}
