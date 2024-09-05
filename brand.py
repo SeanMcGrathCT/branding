@@ -108,9 +108,9 @@ elif action == "Update Existing Chart":
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
             labels = list(chart_data["data"].values())[0].keys()
-            datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
+            datasets = [{"label": k, "data": list(v.values()), "backgroundColor": v.get("backgroundColor", []), "borderColor": v.get("borderColor", [])} for k, v in chart_data["data"].items()]
 
-            # Convert string data back to numeric values for chart rendering
+            # Convert string data back to numeric values for chart rendering and retain colors
             for dataset in datasets:
                 dataset["data"] = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in dataset["data"]]
 
