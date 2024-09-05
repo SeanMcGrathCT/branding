@@ -26,7 +26,7 @@ vpn_colors = {
 def get_provider_color(provider_name):
     if isinstance(provider_name, str):
         provider_name = provider_name.lower()
-        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')  # Ensuring color mapping
     return 'rgba(75, 192, 192, 0.8)'
 
 def generate_unique_id(title):
@@ -100,11 +100,11 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].values())[0].keys()
             datasets = []
 
-            # Loop through the data to extract values and apply color logic
+            # Apply color logic directly when building datasets
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
                 
-                # Apply color logic based on provider name
+                # Always get color from get_provider_color function
                 background_colors = [get_provider_color(k)] * len(data_values)
                 border_colors = background_colors
                 
@@ -132,7 +132,7 @@ elif action == "Update Existing Chart":
             source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data, key='data_editor_update')
-            
+
 if source_data is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
     
