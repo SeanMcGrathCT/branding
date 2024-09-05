@@ -108,13 +108,13 @@ elif action == "Update Existing Chart":
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
             labels = list(chart_data["data"].values())[0].keys()
-            # Include color extraction from datasets
             datasets = []
+            
+            # Loop through the data to extract values and colors
             for k, v in chart_data["data"].items():
-                data_values = list(v.values())
-                # If colors exist in the dataset, retain them
-                background_colors = v.get("backgroundColor", [get_provider_color(k)] * len(data_values))
-                border_colors = v.get("borderColor", background_colors)
+                data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
+                background_colors = chart_data["backgroundColor"] if "backgroundColor" in chart_data else [get_provider_color(k)] * len(data_values)
+                border_colors = chart_data["borderColor"] if "borderColor" in chart_data else background_colors
                 
                 datasets.append({
                     "label": k,
@@ -123,7 +123,23 @@ elif action == "Update Existing Chart":
                     "borderColor": border_colors,
                     "borderWidth": 1
                 })
-            
+
+            seo_title = chart_data.get("name", "")
+            seo_description = chart_data.get("description", "")
+            measurement_unit = "Mbps"
+            empty_bar_text = "No data available"
+            display_legend = True
+            grouping_method = "Provider"
+            chart_size = "Full Width"
+            chart_width = 805
+            chart_height = 600
+            label_column = "VPN provider"
+            data_dict = {label_column: labels}
+            for dataset in datasets:
+                data_dict[dataset["label"]] = dataset["data"]
+            source_data = pd.DataFrame(data_dict)
+            st.write("Data Preview:")
+            source_data = st.data_editor(source_data)            
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             measurement_unit = "Mbps"
