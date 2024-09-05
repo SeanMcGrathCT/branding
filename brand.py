@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import json
 import re
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from datetime import datetime
 import uuid
 
 # Define VPN colors with less transparency for a more defined look
@@ -29,7 +26,7 @@ def get_provider_color(provider_name):
         return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
     return 'rgba(75, 192, 192, 0.8)'
 
-# Function to extract colors from existing chart data
+# Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
         # Extract color arrays from the HTML content
@@ -58,22 +55,10 @@ def extract_colors_from_html(html_content):
         st.error(f"Failed to extract colors from HTML: {e}")
         return [], []
 
+# Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
     return unique_id
-
-# Function to generate ld+json metadata
-def generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit):
-    data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
-    
-    metadata = {
-        "@context": "http://schema.org",
-        "@type": "Dataset",
-        "name": seo_title,
-        "description": seo_description,
-        "data": data_dict
-    }
-    return metadata
 
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
@@ -106,12 +91,9 @@ seo_description = ""
 label_column = ""
 value_columns = []
 measurement_unit = "Mbps"
-empty_bar_text = "No data available"
 chart_size = "Full Width"
 chart_width = 805
 chart_height = 600
-grouping_method = "Provider"
-display_legend = True
 source_data = None
 
 if action == "Create New Chart":
@@ -132,6 +114,10 @@ elif action == "Update Existing Chart":
             # Extract colors from existing HTML
             background_colors, border_colors = extract_colors_from_html(chart_html)
             
+            # Log the extracted colors in the Streamlit UI for verification
+            st.write("Extracted Background Colors:", background_colors)
+            st.write("Extracted Border Colors:", border_colors)
+            
             # Loop through the data to extract values and apply color logic
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
@@ -151,10 +137,6 @@ elif action == "Update Existing Chart":
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             measurement_unit = "Mbps"
-            empty_bar_text = "No data available"
-            display_legend = True
-            grouping_method = "Provider"
-            chart_size = "Full Width"
             chart_width = 805
             chart_height = 600
             label_column = "VPN provider"
@@ -172,11 +154,7 @@ if source_data is not None:
         label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
         valid_columns = list(source_data.columns)
         default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
-        if chart_type == "Scatter Chart":
-            x_column = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
-            y_column = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
-        else:
-            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
+        value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
     seo_title = st.text_input("Enter the SEO title for the chart:", seo_title, key='seo_title')
     seo_description = st.text_area("Enter the SEO description for the chart:", seo_description, key='seo_description')
@@ -184,144 +162,39 @@ if source_data is not None:
     if chart_type != "Scatter Chart":
         y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)", key='y_axis_label')
     measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit, key='measurement_unit')
-    empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text, key='empty_bar_text')
-    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"], key='chart_size')
-    if chart_size == "Full Width":
-        chart_width = 805
-        chart_height = 600
-    elif chart_size == "Medium":
-        chart_width = 605
-        chart_height = 500
-    else:
-        chart_width = 405
-        chart_height = 400
-    if chart_type == "Grouped Bar Chart":
-        grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
-    else:
-        grouping_method = "Provider"
-
-    display_legend = st.checkbox("Display legend", value=display_legend, key='display_legend')
-
-    # Choice between standalone and production HTML
-    html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0, key='html_type')
 
     if st.button("Generate HTML"):
         datasets = []
         null_value = 0.05  
-        if chart_type == "Scatter Chart":
-            labels = []
-            x_values = []
-            y_values = []
-            for provider in source_data[label_column].unique():
-                provider_data = source_data[source_data[label_column] == provider]
-                try:
-                    x_val = float(provider_data[x_column].values[0])
-                    y_val = float(provider_data[y_column].values[0])
-                    x_values.append(x_val)
-                    y_values.append(y_val)
-                    scatter_data = [{'x': x_val, 'y': y_val}]
-                    background_colors = [get_provider_color(provider)]
-                    border_colors = background_colors
-                    datasets.append({
-                        'label': provider,
-                        'data': scatter_data,
-                        'backgroundColor': background_colors,
-                        'borderColor': border_colors,
-                        'borderWidth': 1,
-                        'showLine': False
-                    })
-                except ValueError as e:
-                    st.error(f"Error converting values to float for provider '{provider}': {e}")
-                    continue
-            if x_values and y_values:
-                x_min, x_max = min(x_values), max(x_values)
-                y_min, y_max = min(y_values), max(y_values)
-        elif chart_type == "Radar Chart":
-            labels = value_columns
-            for provider in source_data[label_column].unique():
-                provider_data = source_data[source_data[label_column] == provider]
-                data = [
-                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
-                    for col in value_columns
-                    if pd.api.types.is_numeric_dtype(source_data[col])
-                ]
-                background_colors = get_provider_color(provider)
-                border_colors = background_colors
-                datasets.append({
-                    'label': provider,
-                    'data': data,
-                    'backgroundColor': background_colors,
-                    'borderColor': border_colors,
-                    'borderWidth': 1
-                })
-        elif grouping_method == "Provider":
-            labels = list(value_columns)
-            unique_providers = source_data[label_column].unique()
-            for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
-                data = [
-                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
-                    for col in value_columns
-                    if pd.api.types.is_numeric_dtype(source_data[col])
-                ]
-                background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
-                    for col in value_columns
-                ]
-                border_colors = background_colors
-                datasets.append({
-                    'label': provider,
-                    'data': data,
-                    'backgroundColor': background_colors,
-                    'borderColor': border_colors,
-                    'borderWidth': 1
-                })
-        else:
-            labels = source_data[label_column].tolist()
-            color_index = 0
-            for col in value_columns:
-                values = [
-                    float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
-                    for value in source_data[col].tolist()
-                    if pd.api.types.is_numeric_dtype(source_data[col])
-                ]
-                background_colors = [
-                    vpn_colors.get(col.lower(), 'rgba(75, 192, 192, 0.8)') if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
-                    for value in values
-                ]
-                border_colors = background_colors
-                datasets.append({
-                    'label': col,
-                    'data': values,
-                    'backgroundColor': background_colors,
-                    'borderColor': border_colors,
-                    'borderWidth': 1
-                })
-                color_index += 1
+        labels = source_data[label_column].tolist()
+        for provider in labels:
+            data = [source_data[col].values[0] for col in value_columns]
+            background_colors = [get_provider_color(provider)] * len(data)
+            border_colors = background_colors
+            datasets.append({
+                "label": provider,
+                "data": data,
+                "backgroundColor": background_colors,
+                "borderColor": border_colors,
+                "borderWidth": 1
+            })
 
-        # Escape special characters in seo_title and unique_id
-        seo_title_escaped = json.dumps(seo_title)
-        unique_id_safe = re.sub(r'[^a-zA-Z0-9_]', '_', generate_unique_id(seo_title))
+        # Log the generated colors in the Streamlit UI for verification
+        st.write("Generated Background Colors:", background_colors)
+        st.write("Generated Border Colors:", border_colors)
 
-        metadata = generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit)
-
+        # Create HTML content with chart
+        unique_id_safe = generate_unique_id(seo_title)
         html_content = f"""
 <div id="{unique_id_safe}" style="max-width: {chart_width}px; margin: 0 auto;">
     <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id_safe}" width="{chart_width}" height="{chart_height}"></canvas>
 </div>
-"""
-        if html_type == "Standalone":
-            html_content += f"""
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-"""
-
-        html_content += f"""
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
         var ctx = document.getElementById('vpnSpeedChart_{unique_id_safe}').getContext('2d');
-        
         var vpnSpeedChart = new Chart(ctx, {{
-            type: '{'radar' if chart_type == 'Radar Chart' else 'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
+            type: '{chart_type.lower()}',
             data: {{
                 labels: {json.dumps(labels)},
                 datasets: {json.dumps(datasets, default=str)}
@@ -331,45 +204,19 @@ if source_data is not None:
                 plugins: {{
                     title: {{
                         display: true,
-                        text: {seo_title_escaped},
-                        font: {{
-                            size: 18
-                        }}
+                        text: {json.dumps(seo_title)},
+                        font: {{ size: 18 }}
                     }},
                     legend: {{
-                        display: {str(display_legend).lower()}
-                    }},
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                if (context.raw <= {null_value * 1.1}) {{
-                                    return '{empty_bar_text}';
-                                }}
-                                if (context.raw && context.raw.x !== undefined && context.raw.y !== undefined) {{
-                                    return context.dataset.label + ': (' + context.raw.x + ', ' + context.raw.y + ')';
-                                }}
-                                return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
-                            }}
-                        }}
+                        display: true
                     }}
                 }},
                 scales: {{
-                    x: {{
-                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {(x_min - 1) if chart_type == 'Scatter Chart' else 'null'},
-                        max: {(x_max + 1) if chart_type == 'Scatter Chart' else 'null'},
-                        title: {{
-                            display: true,
-                            text: '{x_column if chart_type == 'Scatter Chart' else ''}'
-                        }}
-                    }},
                     y: {{
-                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {(y_min - 5) if chart_type == 'Scatter Chart' else 'null'},
-                        max: {(y_max + 5) if chart_type == 'Scatter Chart' else 'null'},
+                        beginAtZero: true,
                         title: {{
                             display: true,
-                            text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
+                            text: '{y_axis_label}'
                         }}
                     }}
                 }}
@@ -377,14 +224,7 @@ if source_data is not None:
         }});
     }});
 </script>
-<script type="application/ld+json">
-{json.dumps(metadata, indent=4)}
-</script>
 """
 
-        st.download_button(
-            label="Download HTML",
-            data=html_content,
-            file_name=f"{unique_id_safe}.html",
-            mime="text/html"
-        )
+        st.download_button("Download HTML", data=html_content, file_name=f"{unique_id_safe}.html", mime="text/html")
+
