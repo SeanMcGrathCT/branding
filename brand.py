@@ -100,15 +100,14 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].values())[0].keys()
             datasets = []
 
-            # Loop through the data to extract values and colors
+            # Loop through the data to extract values and apply color logic
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
                 
-                # Extract colors from the existing chart data if available
-                # Otherwise, fallback to the default color based on provider name
-                background_colors = v.get("backgroundColor", [get_provider_color(k)] * len(data_values))
-                border_colors = v.get("borderColor", background_colors)
-
+                # Apply color logic based on provider name
+                background_colors = [get_provider_color(k)] * len(data_values)
+                border_colors = background_colors
+                
                 datasets.append({
                     "label": k,
                     "data": data_values,
@@ -133,9 +132,7 @@ elif action == "Update Existing Chart":
             source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data, key='data_editor_update')
-
-# Further down, make sure the extracted colors are correctly passed when generating the chart.
-
+            
 if source_data is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
     
