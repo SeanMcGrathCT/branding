@@ -110,20 +110,13 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].values())[0].keys()
             datasets = []
             
-            # Loop through the data to extract values and colors
+            # Loop through the data to extract values and reapply color logic
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
                 
-                # Ensure the correct colors are extracted for each dataset
-                if "backgroundColor" in v:
-                    background_colors = v["backgroundColor"]
-                else:
-                    background_colors = [get_provider_color(k)] * len(data_values)
-                
-                if "borderColor" in v:
-                    border_colors = v["borderColor"]
-                else:
-                    border_colors = background_colors
+                # Reapply provider color logic if colors are missing
+                background_colors = [get_provider_color(k)] * len(data_values)
+                border_colors = background_colors
                 
                 datasets.append({
                     "label": k,
