@@ -30,17 +30,30 @@ def get_provider_color(provider_name):
     return 'rgba(75, 192, 192, 0.8)'
 
 # Function to extract colors from existing chart data
+# Function to extract colors from existing chart data
 def extract_colors_from_html(html_content):
     try:
+        # Extract color arrays from the HTML content
         background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
         border_color_pattern = r'borderColor":\s*\[(.*?)\]'
         
+        # Find the matches for background and border colors
         background_colors_match = re.search(background_color_pattern, html_content)
         border_colors_match = re.search(border_color_pattern, html_content)
-        
-        background_colors = json.loads(background_colors_match.group(1)) if background_colors_match else []
-        border_colors = json.loads(border_colors_match.group(1)) if border_colors_match else []
-        
+
+        # Extract the color values (handle it as a string, cleaning up extra characters)
+        if background_colors_match:
+            background_colors_str = background_colors_match.group(1)
+            background_colors = re.findall(r'rgba?\([^\)]+\)', background_colors_str)
+        else:
+            background_colors = []
+
+        if border_colors_match:
+            border_colors_str = border_colors_match.group(1)
+            border_colors = re.findall(r'rgba?\([^\)]+\)', border_colors_str)
+        else:
+            border_colors = []
+
         return background_colors, border_colors
     except Exception as e:
         st.error(f"Failed to extract colors from HTML: {e}")
