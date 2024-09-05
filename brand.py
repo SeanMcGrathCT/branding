@@ -29,26 +29,14 @@ def get_provider_color(provider_name):
 # Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
-        # Extract color arrays from the HTML content
         background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
         border_color_pattern = r'borderColor":\s*\[(.*?)\]'
         
-        # Find the matches for background and border colors
         background_colors_match = re.search(background_color_pattern, html_content)
         border_colors_match = re.search(border_color_pattern, html_content)
 
-        # Extract the color values (handle it as a string, cleaning up extra characters)
-        if background_colors_match:
-            background_colors_str = background_colors_match.group(1)
-            background_colors = re.findall(r'rgba?\([^\)]+\)', background_colors_str)
-        else:
-            background_colors = []
-
-        if border_colors_match:
-            border_colors_str = border_colors_match.group(1)
-            border_colors = re.findall(r'rgba?\([^\)]+\)', border_colors_str)
-        else:
-            border_colors = []
+        background_colors = re.findall(r'rgba?\([^\)]+\)', background_colors_match.group(1)) if background_colors_match else []
+        border_colors = re.findall(r'rgba?\([^\)]+\)', border_colors_match.group(1)) if border_colors_match else []
 
         return background_colors, border_colors
     except Exception as e:
@@ -122,13 +110,12 @@ elif action == "Update Existing Chart":
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            labels = list(chart_data["data"].values())[0].keys()
+            labels = list(chart_data["data"].keys())  # Correctly extract labels as a list
             datasets = []
 
             # Extract colors from existing HTML
             background_colors, border_colors = extract_colors_from_html(chart_html)
             
-            # Log the extracted colors in the Streamlit UI for verification
             st.write("Extracted Background Colors:", background_colors)
             st.write("Extracted Border Colors:", border_colors)
             
@@ -136,7 +123,6 @@ elif action == "Update Existing Chart":
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
                 
-                # Use extracted colors or fallback to provider-based color logic
                 bg_colors = background_colors if background_colors else [get_provider_color(k)] * len(data_values)
                 br_colors = border_colors if border_colors else bg_colors
                 
@@ -201,7 +187,6 @@ if source_data is not None:
         datasets = []
         null_value = 0.05  
         
-        # Build datasets based on the selected chart type
         if chart_type == "Grouped Bar Chart":
             labels = list(value_columns)
             for provider in source_data[label_column].unique():
@@ -220,15 +205,11 @@ if source_data is not None:
                     'borderWidth': 1
                 })
         else:
-            # Other chart types handled similarly as needed
+            pass  # Handle other chart types
 
-            pass  # Implementation for other chart types
-
-        # Log the colors being applied to the chart for comparison
         st.write("Generated Background Colors:", background_colors)
         st.write("Generated Border Colors:", border_colors)
 
-        # Generate the HTML content for the chart
         unique_id_safe = generate_unique_id(seo_title)
         metadata = generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit)
 
@@ -277,4 +258,3 @@ if source_data is not None:
 </script>
 """
         st.download_button("Download HTML", data=html_content, file_name=f"{unique_id_safe}.html", mime="text/html")
-
