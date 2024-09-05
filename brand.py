@@ -139,7 +139,8 @@ elif action == "Update Existing Chart":
                 data_dict[dataset["label"]] = dataset["data"]
             source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
-            source_data = st.data_editor(source_data)            
+            source_data = st.data_editor(source_data)   
+            
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             measurement_unit = "Mbps"
