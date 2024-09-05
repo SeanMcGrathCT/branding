@@ -23,16 +23,6 @@ vpn_colors = {
     'strongvpn': 'rgba(238, 170, 29, 0.8)'
 }
 
-# Define nice colors for test types
-nice_colors = [
-    'rgba(255, 99, 132, 0.8)',
-    'rgba(54, 162, 235, 0.8)',
-    'rgba(255, 206, 86, 0.8)',
-    'rgba(75, 192, 192, 0.8)',
-    'rgba(153, 102, 255, 0.8)',
-    'rgba(255, 159, 64, 0.8)'
-]
-
 # Function to assign colors based on provider names
 def get_provider_color(provider_name):
     if isinstance(provider_name, str):
@@ -110,11 +100,11 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].values())[0].keys()
             datasets = []
             
-            # Loop through the data to extract values and reapply color logic
+            # Loop through the data to extract values and apply color logic
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
                 
-                # Reapply provider color logic if colors are missing
+                # Apply color logic based on provider
                 background_colors = [get_provider_color(k)] * len(data_values)
                 border_colors = background_colors
                 
