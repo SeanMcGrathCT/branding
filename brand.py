@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import json
 import re
-import random
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
@@ -92,6 +91,7 @@ if action == "Create New Chart":
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
         source_data = st.data_editor(source_data, key='data_editor_new')
+
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
@@ -100,16 +100,16 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].values())[0].keys()
             datasets = []
             
-            # Loop through the data to extract values and apply color logic
-            for k, v in chart_data["data"].items():
+            # Loop through the data to extract values and apply color logic based on provider
+            for provider, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
                 
-                # Apply color logic based on provider
-                background_colors = [get_provider_color(k)] * len(data_values)
+                # Apply the correct color based on the provider
+                background_colors = [get_provider_color(provider)] * len(data_values)
                 border_colors = background_colors
                 
                 datasets.append({
-                    "label": k,
+                    "label": provider,
                     "data": data_values,
                     "backgroundColor": background_colors,
                     "borderColor": border_colors,
@@ -254,7 +254,7 @@ if source_data is not None:
                     if pd.api.types.is_numeric_dtype(source_data[col])
                 ]
                 background_colors = [
-                    nice_colors[color_index % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    vpn_colors.get(col.lower(), 'rgba(75, 192, 192, 0.8)') if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
                     for value in values
                 ]
                 border_colors = background_colors
@@ -350,35 +350,9 @@ if source_data is not None:
 </script>
 """
 
-        html_file_path = f"{unique_id_safe}.html"
-        with open(html_file_path, "w") as html_file:
-            html_file.write(html_content)
-
         st.download_button(
             label="Download HTML",
             data=html_content,
-            file_name="vpn_speed_comparison.html",
+            file_name=f"{unique_id_safe}.html",
             mime="text/html"
         )
-
-        google_credentials = service_account.Credentials.from_service_account_info(
-            dict(st.secrets["GCP_SERVICE_ACCOUNT"])
-        )
-        service = build('sheets', 'v4', credentials=google_credentials)
-        sheet = service.spreadsheets()
-
-        log_data = [
-            unique_id_safe,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            seo_title,
-            seo_description
-        ]
-
-        sheet.values().append(
-            spreadsheetId="1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q",
-            range="charts!A:D",
-            valueInputOption="USER_ENTERED",
-            body={"values": [log_data]}
-        ).execute()
-
-st.write("Log:")
