@@ -26,8 +26,25 @@ vpn_colors = {
 def get_provider_color(provider_name):
     if isinstance(provider_name, str):
         provider_name = provider_name.lower()
-        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')  # Ensuring color mapping
+        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
     return 'rgba(75, 192, 192, 0.8)'
+
+# Function to extract colors from existing chart data
+def extract_colors_from_html(html_content):
+    try:
+        background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
+        border_color_pattern = r'borderColor":\s*\[(.*?)\]'
+        
+        background_colors_match = re.search(background_color_pattern, html_content)
+        border_colors_match = re.search(border_color_pattern, html_content)
+        
+        background_colors = json.loads(background_colors_match.group(1)) if background_colors_match else []
+        border_colors = json.loads(border_colors_match.group(1)) if border_colors_match else []
+        
+        return background_colors, border_colors
+    except Exception as e:
+        st.error(f"Failed to extract colors from HTML: {e}")
+        return [], []
 
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
@@ -100,19 +117,22 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].values())[0].keys()
             datasets = []
 
-            # Apply color logic directly when building datasets
+            # Extract colors from existing HTML
+            background_colors, border_colors = extract_colors_from_html(chart_html)
+            
+            # Loop through the data to extract values and apply color logic
             for k, v in chart_data["data"].items():
                 data_values = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in v.values()]
                 
-                # Always get color from get_provider_color function
-                background_colors = [get_provider_color(k)] * len(data_values)
-                border_colors = background_colors
+                # Use extracted colors or fallback to provider-based color logic
+                bg_colors = background_colors if background_colors else [get_provider_color(k)] * len(data_values)
+                br_colors = border_colors if border_colors else bg_colors
                 
                 datasets.append({
                     "label": k,
                     "data": data_values,
-                    "backgroundColor": background_colors,
-                    "borderColor": border_colors,
+                    "backgroundColor": bg_colors,
+                    "borderColor": br_colors,
                     "borderWidth": 1
                 })
 
