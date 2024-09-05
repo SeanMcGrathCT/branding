@@ -30,7 +30,6 @@ def get_provider_color(provider_name):
     return 'rgba(75, 192, 192, 0.8)'
 
 # Function to extract colors from existing chart data
-# Function to extract colors from existing chart data
 def extract_colors_from_html(html_content):
     try:
         # Extract color arrays from the HTML content
