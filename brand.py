@@ -19,12 +19,14 @@ vpn_colors = {
     'strongvpn': 'rgba(238, 170, 29, 0.8)'
 }
 
+# Function to assign colors based on provider names
 def get_provider_color(provider_name):
     if isinstance(provider_name, str):
         provider_name = provider_name.lower()
         return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
     return 'rgba(75, 192, 192, 0.8)'
 
+# Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
         background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
@@ -41,10 +43,12 @@ def extract_colors_from_html(html_content):
         st.error(f"Failed to extract colors from HTML: {e}")
         return [], []
 
+# Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
     return unique_id
 
+# Function to generate ld+json metadata
 def generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit):
     data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
     
@@ -57,6 +61,7 @@ def generate_metadata(seo_title, seo_description, source_data, label_column, val
     }
     return metadata
 
+# Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
 
 def load_chart_data_from_html(html_content):
@@ -78,9 +83,10 @@ def load_chart_data_from_html(html_content):
         st.error(e)
         return None
 
+# Radio button for creating or updating chart
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_choice')
 
-# Initialize variables
+# Initialize variables for form fields
 seo_title = ""
 seo_description = ""
 label_column = ""
@@ -107,7 +113,7 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].keys())  
             datasets = []
 
-            # Extract colors from HTML
+            # Extract colors from existing HTML
             background_colors, border_colors = extract_colors_from_html(chart_html)
             st.write("Extracted Background Colors:", background_colors)
             st.write("Extracted Border Colors:", border_colors)
@@ -128,14 +134,24 @@ elif action == "Update Existing Chart":
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
             label_column = "VPN provider"
-            max_len = max(len(d["data"]) for d in datasets)
-            data_dict = {label_column: labels[:max_len]}  
-            for dataset in datasets:
-                data_dict[dataset["label"]] = dataset["data"][:max_len]  
+            
+            # Find max length of datasets and labels
+            max_len = max([len(d['data']) for d in datasets])
 
-            source_data = pd.DataFrame(data_dict)
-            st.write("Data Preview:")
-            source_data = st.data_editor(source_data, key='data_editor_update')
+            # Ensure all columns and labels are of equal lengths
+            labels = labels[:max_len]  # Truncate labels to max_len
+            data_dict = {label_column: labels}  # Initialize data_dict with truncated labels
+
+            for dataset in datasets:
+                # Truncate dataset data to max_len and add to data_dict
+                data_dict[dataset["label"]] = dataset["data"][:max_len]
+
+            try:
+                source_data = pd.DataFrame(data_dict)
+                st.write("Data Preview:")
+                source_data = st.data_editor(source_data, key='data_editor_update')
+            except ValueError as e:
+                st.error(f"Data frame creation failed: {e}")
 
 if source_data is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
@@ -221,4 +237,3 @@ if source_data is not None:
 </script>
 """
         st.download_button("Download HTML", data=html_content, file_name=f"{unique_id_safe}.html", mime="text/html")
-
