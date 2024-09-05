@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import uuid
 
-# Define VPN colors with less transparency for a more defined look
+# Define VPN colors as a fallback
 vpn_colors = {
     'nordvpn': 'rgba(62, 95, 255, 0.8)',
     'surfshark': 'rgba(30, 191, 191, 0.8)',
@@ -58,22 +58,10 @@ def extract_colors_from_html(html_content):
         st.error(f"Failed to extract colors from HTML: {e}")
         return [], []
 
+# Function to generate unique IDs
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
     return unique_id
-
-# Function to generate ld+json metadata
-def generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit):
-    data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
-    
-    metadata = {
-        "@context": "http://schema.org",
-        "@type": "Dataset",
-        "name": seo_title,
-        "description": seo_description,
-        "data": data_dict
-    }
-    return metadata
 
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
