@@ -143,9 +143,13 @@ elif action == "Update Existing Chart":
             chart_width = 805
             chart_height = 600
             label_column = "VPN provider"
-            data_dict = {label_column: labels}
+            
+            # Ensure all columns have equal lengths
+            max_len = max(len(d["data"]) for d in datasets)
+            data_dict = {label_column: labels[:max_len]}  # Truncate to ensure equal length
             for dataset in datasets:
-                data_dict[dataset["label"]] = dataset["data"]
+                data_dict[dataset["label"]] = dataset["data"][:max_len]  # Truncate data if necessary
+
             source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data, key='data_editor_update')
@@ -180,6 +184,7 @@ if source_data is not None:
     else:
         chart_width = 405
         chart_height = 400
+
 
     display_legend = st.checkbox("Display legend", value=True, key='display_legend')
 
