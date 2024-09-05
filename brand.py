@@ -101,7 +101,7 @@ if action == "Create New Chart":
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
-        source_data = st.data_editor(source_data)
+        source_data = st.data_editor(source_data, key='data_editor_new')
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
@@ -139,24 +139,7 @@ elif action == "Update Existing Chart":
                 data_dict[dataset["label"]] = dataset["data"]
             source_data = pd.DataFrame(data_dict)
             st.write("Data Preview:")
-            source_data = st.data_editor(source_data)   
-            
-            seo_title = chart_data.get("name", "")
-            seo_description = chart_data.get("description", "")
-            measurement_unit = "Mbps"
-            empty_bar_text = "No data available"
-            display_legend = True
-            grouping_method = "Provider"
-            chart_size = "Full Width"
-            chart_width = 805
-            chart_height = 600
-            label_column = "VPN provider"
-            data_dict = {label_column: labels}
-            for dataset in datasets:
-                data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
-            st.write("Data Preview:")
-            source_data = st.data_editor(source_data)
+            source_data = st.data_editor(source_data, key='data_editor_update')
 
 if source_data is not None:
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
@@ -171,14 +154,14 @@ if source_data is not None:
         else:
             value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
-    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
-    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
+    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title, key='seo_title')
+    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description, key='seo_description')
 
     if chart_type != "Scatter Chart":
-        y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
-    measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit)
-    empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text)
-    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
+        y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)", key='y_axis_label')
+    measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit, key='measurement_unit')
+    empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text, key='empty_bar_text')
+    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"], key='chart_size')
     if chart_size == "Full Width":
         chart_width = 805
         chart_height = 600
@@ -193,10 +176,10 @@ if source_data is not None:
     else:
         grouping_method = "Provider"
 
-    display_legend = st.checkbox("Display legend", value=display_legend)
+    display_legend = st.checkbox("Display legend", value=display_legend, key='display_legend')
 
     # Choice between standalone and production HTML
-    html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0)
+    html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0, key='html_type')
 
     if st.button("Generate HTML"):
         datasets = []
