@@ -48,7 +48,10 @@ def preprocess_chart_data(chart_data):
     # Iterate over each provider in the chart data
     for provider, tests in chart_data['data'].items():
         row = {"VPN provider": provider}
-        row.update(tests)
+        for test_name, value in tests.items():
+            # Extract numeric value
+            numeric_value = float(re.sub(r'[^\d.]+', '', value))  # Remove non-numeric characters
+            row[test_name] = numeric_value
         formatted_data.append(row)
     
     # Create a dataframe with the structured data
@@ -170,9 +173,8 @@ if source_data is not None:
             for provider in unique_providers:
                 provider_data = source_data[source_data[label_column] == provider]
                 data = [
-                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
+                    float(provider_data[col].values[0]) if isinstance(provider_data[col].values[0], (int, float)) else provider_data[col].values[0]
                     for col in value_columns
-                    if pd.api.types.is_numeric_dtype(source_data[col])
                 ]
                 background_colors = [
                     get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
@@ -198,9 +200,8 @@ if source_data is not None:
             color_index = 0
             for col in value_columns:
                 values = [
-                    float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
+                    float(value) if isinstance(value, (int, float)) else value
                     for value in source_data[col].tolist()
-                    if pd.api.types.is_numeric_dtype(source_data[col])
                 ]
                 background_colors = [
                     nice_colors[color_index % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
