@@ -136,6 +136,7 @@ chart_width = 805
 chart_height = 600
 grouping_method = "Provider"
 display_legend = True
+null_value = 0.05  # Fix: Define null_value to handle empty data points
 source_data = None
 
 if action == "Create New Chart":
