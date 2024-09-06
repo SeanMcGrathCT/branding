@@ -69,9 +69,9 @@ def update_chart(chart_html, source_data, label_column, value_columns):
         st.write("Loaded chart data from HTML.")
         labels = list(chart_data["data"].values())[0].keys()  # These are the test names like "Speed test: UK (a.m.)"
         provider_name = list(chart_data["data"].keys())[0]  # This is the VPN provider name like "PureVPN"
-        datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
+        datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"][provider_name].items()]
 
-        st.write(f"Chart labels: {labels}")
+        st.write(f"Chart labels (test names): {labels}")
         st.write(f"Chart datasets: {datasets}")
         st.write(f"Provider name: {provider_name}")
 
@@ -79,17 +79,17 @@ def update_chart(chart_html, source_data, label_column, value_columns):
         background_colors, border_colors = extract_colors_from_html(chart_html)
 
         for dataset in datasets:
+            st.write(f"Processing dataset for test: {dataset['label']}")
+
             # Use the provider name for color assignment, not the test label
-            st.write(f"Processing dataset for provider: {provider_name}")
-            
-            # Apply extracted colors or use provider colors if available
             if background_colors:
                 dataset["backgroundColor"] = background_colors
                 st.write(f"Using extracted background colors: {background_colors}")
             else:
+                # Assign color based on the VPN provider (PureVPN in this case)
                 dataset["backgroundColor"] = [get_provider_color(provider_name)] * len(dataset["data"])
-                st.write(f"Using default provider color for {provider_name}: {dataset['backgroundColor']}")
-            
+                st.write(f"Using provider color for {provider_name}: {dataset['backgroundColor']}")
+
             if border_colors:
                 dataset["borderColor"] = border_colors
                 st.write(f"Using extracted border colors: {border_colors}")
@@ -105,7 +105,6 @@ def update_chart(chart_html, source_data, label_column, value_columns):
         source_data = pd.DataFrame(data_dict)
         st.write("Updated Data Preview:")
         source_data = st.data_editor(source_data)
-
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
