@@ -40,6 +40,25 @@ def get_provider_color(provider_name):
         return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
     return 'rgba(75, 192, 192, 0.8)'
 
+# Function to extract colors from existing chart data in HTML
+def extract_colors_from_html(html_content):
+    try:
+        # Extract background and border color arrays from HTML
+        background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
+        border_color_pattern = r'borderColor":\s*\[(.*?)\]'
+        
+        background_colors_match = re.search(background_color_pattern, html_content)
+        border_colors_match = re.search(border_color_pattern, html_content)
+
+        background_colors = re.findall(r'rgba?\([^\)]+\)', background_colors_match.group(1)) if background_colors_match else []
+        border_colors = re.findall(r'rgba?\([^\)]+\)', border_colors_match.group(1)) if border_colors_match else []
+
+        return background_colors, border_colors
+    except Exception as e:
+        st.error(f"Failed to extract colors from HTML: {e}")
+        return [], []
+
+# Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
     return unique_id
@@ -110,9 +129,14 @@ elif action == "Update Existing Chart":
             labels = list(chart_data["data"].values())[0].keys()
             datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
 
-            # Convert string data back to numeric values for chart rendering
+            # Extract and apply colors
+            background_colors, border_colors = extract_colors_from_html(chart_html)
+
+            # Apply colors to the dataset if extracted, else use defaults
             for dataset in datasets:
                 dataset["data"] = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in dataset["data"]]
+                dataset["backgroundColor"] = background_colors if background_colors else [get_provider_color(dataset["label"])] * len(dataset["data"])
+                dataset["borderColor"] = border_colors if border_colors else dataset["backgroundColor"]
 
             seo_title = chart_data.get("name", "")
             seo_description = chart_data.get("description", "")
@@ -167,9 +191,6 @@ if source_data is not None:
         grouping_method = "Provider"
 
     display_legend = st.checkbox("Display legend", value=display_legend)
-
-    # Choice between standalone and production HTML
-    html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0)
 
     if st.button("Generate HTML"):
         datasets = []
@@ -348,10 +369,6 @@ if source_data is not None:
 </script>
 """
 
-        html_file_path = f"{unique_id_safe}.html"
-        with open(html_file_path, "w") as html_file:
-            html_file.write(html_content)
-
         st.download_button(
             label="Download HTML",
             data=html_content,
@@ -359,24 +376,3 @@ if source_data is not None:
             mime="text/html"
         )
 
-        google_credentials = service_account.Credentials.from_service_account_info(
-            dict(st.secrets["GCP_SERVICE_ACCOUNT"])
-        )
-        service = build('sheets', 'v4', credentials=google_credentials)
-        sheet = service.spreadsheets()
-
-        log_data = [
-            unique_id_safe,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            seo_title,
-            seo_description
-        ]
-
-        sheet.values().append(
-            spreadsheetId="1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q",
-            range="charts!A:D",
-            valueInputOption="USER_ENTERED",
-            body={"values": [log_data]}
-        ).execute()
-
-st.write("Log:")
