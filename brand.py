@@ -31,37 +31,49 @@ nice_colors = [
 
 # Function to assign colors based on provider names
 def get_provider_color(provider_name):
+    st.write(f"Getting color for provider: {provider_name}")
     if isinstance(provider_name, str):
         provider_name = provider_name.lower()
-        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+        color = vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+        st.write(f"Assigned color: {color}")
+        return color
+    st.write(f"Provider name not a string: {provider_name}")
     return 'rgba(75, 192, 192, 0.8)'
 
 # Function to preprocess and structure the chart data uniformly
 def preprocess_chart_data(chart_data):
+    st.write("Preprocessing chart data...")
     formatted_data = []
+    
     # Iterate over each provider in the chart data
     for provider, tests in chart_data['data'].items():
         row = {"VPN provider": provider}
         row.update(tests)
         formatted_data.append(row)
+    
     # Create a dataframe with the structured data
     df = pd.DataFrame(formatted_data)
+    st.write("Preprocessed Data:")
+    st.write(df)
     return df
 
 # Function to load chart data from HTML
 def load_chart_data_from_html(html_content):
     try:
+        st.write("Loading chart data from HTML...")
         start_marker = '<script type="application/ld+json">'
         end_marker = '</script>'
         start = html_content.find(start_marker)
         end = html_content.find(end_marker, start)
         if start == -1 or end == -1:
             raise ValueError("Could not find the JSON data section in the provided HTML content.")
+        
         json_data = html_content[start+len(start_marker):end].strip()
         data = json.loads(json_data)
+        st.write(f"Loaded data: {data}")
         return data
-    except json.JSONDecodeError:
-        st.error("Failed to parse JSON data from HTML content.")
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to parse JSON data from HTML content: {e}")
         return None
     except ValueError as e:
         st.error(e)
@@ -69,11 +81,13 @@ def load_chart_data_from_html(html_content):
 
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
-    return title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
+    unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
+    return unique_id
 
 # Function to generate ld+json metadata
 def generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit):
     data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
+    
     metadata = {
         "@context": "http://schema.org",
         "@type": "Dataset",
@@ -126,6 +140,7 @@ if source_data is not None:
         label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
         valid_columns = list(source_data.columns)
         default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
+        
         value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
     seo_title = st.text_input("Enter the SEO title for the chart:", "VPN Speed Comparison")
@@ -135,6 +150,7 @@ if source_data is not None:
     measurement_unit = st.text_input("Enter the measurement unit:", "Mbps")
     chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
 
+    # Correctly handle grouping by provider or test type
     if chart_type == "Grouped Bar Chart":
         grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
 
@@ -163,6 +179,13 @@ if source_data is not None:
                     for col in value_columns
                 ]
                 border_colors = background_colors
+
+                # Log the data and background colors for debugging
+                st.write(f"Provider: {provider}")
+                st.write(f"Data: {data}")
+                st.write(f"Background colors: {background_colors}")
+                st.write(f"Border colors: {border_colors}")
+                
                 datasets.append({
                     'label': provider,
                     'data': data,
@@ -184,6 +207,13 @@ if source_data is not None:
                     for value in values
                 ]
                 border_colors = background_colors
+
+                # Log the test type data and background colors for debugging
+                st.write(f"Test Type: {col}")
+                st.write(f"Values: {values}")
+                st.write(f"Background colors: {background_colors}")
+                st.write(f"Border colors: {border_colors}")
+
                 datasets.append({
                     'label': col,
                     'data': values,
