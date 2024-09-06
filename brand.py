@@ -61,62 +61,22 @@ def extract_colors_from_html(html_content):
         st.error(f"Failed to extract colors from HTML: {e}")
         return [], []
 
-# Function to extract VPN provider from the chart data
-def extract_vpn_provider_from_data(chart_data):
-    st.write("Extracting VPN provider from chart data...")
-    provider_name = list(chart_data["data"].keys())[0]
-    st.write(f"Detected provider from chart data: {provider_name}")
-    return provider_name
-
-# Updated function to update the existing chart
-def update_chart(chart_html, source_data, label_column, value_columns):
-    st.write("Updating chart with HTML content...")
-    chart_data = load_chart_data_from_html(chart_html)
+# Function to preprocess and structure the chart data uniformly
+def preprocess_chart_data(chart_data):
+    st.write("Preprocessing chart data...")
+    formatted_data = []
     
-    if chart_data:
-        st.write("Loaded chart data from HTML.")
-
-        # Extract the VPN provider name from the chart data itself
-        provider_name = extract_vpn_provider_from_data(chart_data)
-        
-        # The test labels like "Speed test: UK (a.m.)", "Speed test: UK (noon)"
-        labels = list(chart_data["data"][provider_name].keys())  # These are test labels
-        datasets = [{"label": provider_name, "data": list(chart_data["data"][provider_name].values())}]
-        
-        st.write(f"Chart labels (test names): {labels}")
-        st.write(f"Provider name: {provider_name}")
-        st.write(f"Chart datasets: {datasets}")
-
-        # Extract and apply colors from the HTML if they exist
-        background_colors, border_colors = extract_colors_from_html(chart_html)
-
-        for dataset in datasets:
-            st.write(f"Processing dataset for provider: {provider_name}")
-
-            # Apply extracted background colors if available
-            if background_colors:
-                dataset["backgroundColor"] = background_colors
-                st.write(f"Using extracted background colors: {background_colors}")
-            else:
-                dataset["backgroundColor"] = [get_provider_color(provider_name)] * len(dataset["data"])
-                st.write(f"Using provider color for {provider_name}: {dataset['backgroundColor']}")
-
-            # Apply extracted border colors if available
-            if border_colors:
-                dataset["borderColor"] = border_colors
-                st.write(f"Using extracted border colors: {border_colors}")
-            else:
-                dataset["borderColor"] = dataset["backgroundColor"]
-                st.write(f"Using default border color: {dataset['borderColor']}")
-
-        # Display updated data and colors
-        data_dict = {label_column: labels}
-        for dataset in datasets:
-            data_dict[dataset["label"]] = dataset["data"]
-
-        source_data = pd.DataFrame(data_dict)
-        st.write("Updated Data Preview:")
-        source_data = st.data_editor(source_data)
+    # Iterate over each provider in the chart data
+    for provider, tests in chart_data['data'].items():
+        row = {"VPN provider": provider}
+        row.update(tests)
+        formatted_data.append(row)
+    
+    # Create a dataframe with the structured data
+    df = pd.DataFrame(formatted_data)
+    st.write("Preprocessed Data:")
+    st.write(df)
+    return df
 
 # Function to load chart data from HTML
 def load_chart_data_from_html(html_content):
@@ -139,7 +99,7 @@ def load_chart_data_from_html(html_content):
     except ValueError as e:
         st.error(e)
         return None
-        
+
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
@@ -189,32 +149,8 @@ elif action == "Update Existing Chart":
     if chart_html:
         chart_data = load_chart_data_from_html(chart_html)
         if chart_data:
-            labels = list(chart_data["data"].values())[0].keys()
-            datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
-
-            # Extract and apply colors
-            background_colors, border_colors = extract_colors_from_html(chart_html)
-
-            # Apply colors to the dataset if extracted, else use defaults
-            for dataset in datasets:
-                dataset["data"] = [float(re.sub("[^0-9.]", "", str(val))) if isinstance(val, str) else val for val in dataset["data"]]
-                dataset["backgroundColor"] = background_colors if background_colors else [get_provider_color(dataset["label"])] * len(dataset["data"])
-                dataset["borderColor"] = border_colors if border_colors else dataset["backgroundColor"]
-
-            seo_title = chart_data.get("name", "")
-            seo_description = chart_data.get("description", "")
-            measurement_unit = "Mbps"
-            empty_bar_text = "No data available"
-            display_legend = True
-            grouping_method = "Provider"
-            chart_size = "Full Width"
-            chart_width = 805
-            chart_height = 600
-            label_column = "VPN provider"
-            data_dict = {label_column: labels}
-            for dataset in datasets:
-                data_dict[dataset["label"]] = dataset["data"]
-            source_data = pd.DataFrame(data_dict)
+            # Preprocess the chart data to ensure consistent structure
+            source_data = preprocess_chart_data(chart_data)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
@@ -225,35 +161,20 @@ if source_data is not None:
         label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
         valid_columns = list(source_data.columns)
         default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
-        if chart_type == "Scatter Chart":
-            x_column = st.selectbox("Select the column for X-axis values:", valid_columns, key='x_column')
-            y_column = st.selectbox("Select the column for Y-axis values:", valid_columns, key='y_column')
-        else:
-            value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
+        
+        value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
-    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
-    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
+    seo_title = st.text_input("Enter the SEO title for the chart:", "VPN Speed Comparison")
+    seo_description = st.text_area("Enter the SEO description for the chart:", "This chart compares VPN speeds.")
 
-    if chart_type != "Scatter Chart":
-        y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
-    measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit)
-    empty_bar_text = st.text_input("Enter the text for empty bar tooltips:", empty_bar_text)
+    y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
+    measurement_unit = st.text_input("Enter the measurement unit:", "Mbps")
     chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
-    if chart_size == "Full Width":
-        chart_width = 805
-        chart_height = 600
-    elif chart_size == "Medium":
-        chart_width = 605
-        chart_height = 500
-    else:
-        chart_width = 405
-        chart_height = 400
+
     if chart_type == "Grouped Bar Chart":
         grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
-    else:
-        grouping_method = "Provider"
 
-    display_legend = st.checkbox("Display legend", value=display_legend)
+    display_legend = st.checkbox("Display legend", value=True)
 
     # Add this to define `html_type`
     html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0)
