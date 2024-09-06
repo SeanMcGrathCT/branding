@@ -62,48 +62,59 @@ def extract_colors_from_html(html_content):
         return [], []
 
 # Function to update existing chart
-def update_chart(chart_html, source_data, label_column, value_columns):
+def update_chart(chart_html, source_data, label_column, value_columns, grouping_method):
     st.write("Updating chart with HTML content...")
     chart_data = load_chart_data_from_html(chart_html)
     
     if chart_data:
         st.write("Loaded chart data from HTML.")
-
-        # The test labels like "Speed test: UK (a.m.)", "Speed test: UK (noon)"
-        labels = list(chart_data["data"].values())[0].keys()
         
-        # The provider name like "PureVPN"
-        provider_name = list(chart_data["data"].keys())[0]
+        if grouping_method == "Provider":
+            # Grouping by provider: provider names are in rows, test labels in columns
+            labels = list(chart_data["data"].values())[0].keys()  # These are the test names
+            provider_name = list(chart_data["data"].keys())[0]  # VPN provider name
+            datasets = [{"label": provider_name, "data": list(chart_data["data"][provider_name].values())}]
+        else:
+            # Grouping by test: provider names are in columns, test labels in rows
+            labels = list(chart_data["data"].keys())  # These are the provider names
+            provider_name = label_column  # Use the row header for color assignment
+            datasets = [{"label": label_column, "data": list(chart_data["data"][label_column].values())}]
         
-        # The datasets for the chart, we use the provider_name as the label and the test results as data
-        datasets = [{"label": provider_name, "data": list(chart_data["data"][provider_name].values())}]
-        
-        st.write(f"Chart labels (test names): {labels}")
-        st.write(f"Provider name: {provider_name}")
+        st.write(f"Chart labels: {labels}")
+        st.write(f"Provider/Test name for color assignment: {provider_name}")
         st.write(f"Chart datasets: {datasets}")
 
-        # Extract and apply colors from the HTML if they exist
+        # Extract and apply colors
         background_colors, border_colors = extract_colors_from_html(chart_html)
-        
+
         for dataset in datasets:
-            st.write(f"Processing dataset for provider: {provider_name}")
-            
-            # Use the extracted background colors if available
+            st.write(f"Processing dataset for {provider_name}")
+
+            # Apply extracted background colors if available
             if background_colors:
                 dataset["backgroundColor"] = background_colors
                 st.write(f"Using extracted background colors: {background_colors}")
             else:
-                # If not, assign colors based on the provider (PureVPN)
+                # Assign colors based on the provider (or test if transposed)
                 dataset["backgroundColor"] = [get_provider_color(provider_name)] * len(dataset["data"])
-                st.write(f"Using provider color for {provider_name}: {dataset['backgroundColor']}")
+                st.write(f"Using color for {provider_name}: {dataset['backgroundColor']}")
 
-            # Use the extracted border colors if available
+            # Apply extracted border colors if available
             if border_colors:
                 dataset["borderColor"] = border_colors
                 st.write(f"Using extracted border colors: {border_colors}")
             else:
                 dataset["borderColor"] = dataset["backgroundColor"]
                 st.write(f"Using default border color: {dataset['borderColor']}")
+
+        # Display updated data and colors
+        data_dict = {label_column: labels}
+        for dataset in datasets:
+            data_dict[dataset["label"]] = dataset["data"]
+
+        source_data = pd.DataFrame(data_dict)
+        st.write("Updated Data Preview:")
+        source_data = st.data_editor(source_data)
 
         # Display updated data and colors
         data_dict = {label_column: labels}
