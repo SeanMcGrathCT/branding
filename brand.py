@@ -39,8 +39,7 @@ def get_provider_color(provider_name):
         return color
     st.write(f"Provider name not a string: {provider_name}")
     return 'rgba(75, 192, 192, 0.8)'
-
-# Function to extract colors from existing chart data in HTML
+    
 def extract_colors_from_html(html_content):
     try:
         st.write("Extracting colors from HTML...")
