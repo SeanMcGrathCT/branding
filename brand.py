@@ -67,17 +67,19 @@ def update_chart(chart_html, source_data, label_column, value_columns):
     chart_data = load_chart_data_from_html(chart_html)
     if chart_data:
         st.write("Loaded chart data from HTML.")
-        labels = list(chart_data["data"].values())[0].keys()
+        labels = list(chart_data["data"].values())[0].keys()  # These are the test names like "Speed test: UK (a.m.)"
+        provider_name = list(chart_data["data"].keys())[0]  # This is the VPN provider name like "PureVPN"
         datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
 
         st.write(f"Chart labels: {labels}")
         st.write(f"Chart datasets: {datasets}")
+        st.write(f"Provider name: {provider_name}")
 
         # Extract and apply colors
         background_colors, border_colors = extract_colors_from_html(chart_html)
 
         for dataset in datasets:
-            provider_name = dataset["label"].lower()
+            # Use the provider name for color assignment, not the test label
             st.write(f"Processing dataset for provider: {provider_name}")
             
             # Apply extracted colors or use provider colors if available
