@@ -136,7 +136,6 @@ chart_width = 805
 chart_height = 600
 grouping_method = "Provider"
 display_legend = True
-null_value = 0.05  # Fix: Define null_value to handle empty data points
 source_data = None
 
 if action == "Create New Chart":
@@ -172,6 +171,7 @@ if source_data is not None:
     measurement_unit = st.text_input("Enter the measurement unit:", "Mbps")
     chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
 
+    # Correctly handle grouping by provider or test type
     if chart_type == "Grouped Bar Chart":
         grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
 
@@ -182,23 +182,55 @@ if source_data is not None:
 
     if st.button("Generate HTML"):
         datasets = []
-        labels = list(value_columns)
-        unique_providers = source_data[label_column].unique()
-        color_index = 0
+        null_value = 0.05  
         
-        for provider in unique_providers:
-            provider_data = source_data[source_data[label_column] == provider]
-            data = [float(provider_data[col].values[0]) for col in value_columns]
-            background_colors = [get_provider_color(provider)] * len(value_columns)
-            border_colors = background_colors
-            datasets.append({
-                'label': provider,
-                'data': data,
-                'backgroundColor': background_colors,
-                'borderColor': border_colors,
-                'borderWidth': 1
-            })
+        # Handle grouping by Provider or Test Type
+        if grouping_method == "Provider":
+            labels = list(value_columns)
+            unique_providers = source_data[label_column].unique()
+            for provider in unique_providers:
+                provider_data = source_data[source_data[label_column] == provider]
+                data = [
+                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
+                    for col in value_columns
+                    if pd.api.types.is_numeric_dtype(source_data[col])
+                ]
+                background_colors = [
+                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
+                    for col in value_columns
+                ]
+                border_colors = background_colors
+                datasets.append({
+                    'label': provider,
+                    'data': data,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
+                    'borderWidth': 1
+                })
+        else:  # Group by Test Type
+            labels = source_data[label_column].tolist()
+            color_index = 0
+            for col in value_columns:
+                values = [
+                    float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
+                    for value in source_data[col].tolist()
+                    if pd.api.types.is_numeric_dtype(source_data[col])
+                ]
+                background_colors = [
+                    nice_colors[color_index % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
+                    for value in values
+                ]
+                border_colors = background_colors
+                datasets.append({
+                    'label': col,
+                    'data': values,
+                    'backgroundColor': background_colors,
+                    'borderColor': border_colors,
+                    'borderWidth': 1
+                })
+                color_index += 1
 
+        # Escape special characters in seo_title and unique_id
         seo_title_escaped = json.dumps(seo_title)
         unique_id_safe = re.sub(r'[^a-zA-Z0-9_]', '_', generate_unique_id(seo_title))
 
@@ -251,17 +283,17 @@ if source_data is not None:
                 }},
                 scales: {{
                     x: {{
-                        beginAtZero: true,
+                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
                         title: {{
                             display: true,
-                            text: ''
+                            text: '{x_column if chart_type == 'Scatter Chart' else ''}'
                         }}
                     }},
                     y: {{
-                        beginAtZero: true,
+                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
                         title: {{
                             display: true,
-                            text: '{y_axis_label}'
+                            text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
                         }}
                     }}
                 }}
