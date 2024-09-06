@@ -2,10 +2,6 @@ import streamlit as st
 import pandas as pd
 import json
 import re
-import random
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from datetime import datetime
 import uuid
 
 # Define VPN colors with less transparency for a more defined look
@@ -40,7 +36,6 @@ def get_provider_color(provider_name):
         return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
     return 'rgba(75, 192, 192, 0.8)'
 
-# Function to extract colors from existing chart data in HTML
 # Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
@@ -85,13 +80,6 @@ def update_chart(chart_html, source_data, label_column, value_columns):
         st.write("Updated Data Preview:")
         source_data = st.data_editor(source_data)
 
-# Streamlit UI for updating existing chart
-if action == "Update Existing Chart":
-    chart_html = st.text_area("Paste the HTML content of the existing chart:")
-    if chart_html:
-        # Update chart based on the HTML content and apply the provider colors
-        update_chart(chart_html, source_data, label_column, value_columns)
-
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
@@ -110,9 +98,7 @@ def generate_metadata(seo_title, seo_description, source_data, label_column, val
     }
     return metadata
 
-# Streamlit UI
-st.title("VPN Speed Comparison Chart Generator")
-
+# Function to load chart data from HTML
 def load_chart_data_from_html(html_content):
     try:
         start_marker = '<script type="application/ld+json">'
@@ -131,6 +117,9 @@ def load_chart_data_from_html(html_content):
     except ValueError as e:
         st.error(e)
         return None
+
+# Streamlit UI
+st.title("VPN Speed Comparison Chart Generator")
 
 # Radio button for creating or updating chart
 action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_choice')
