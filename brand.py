@@ -43,7 +43,6 @@ def get_provider_color(provider_name):
 # Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
-        # Extract background and border color arrays from HTML
         background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
         border_color_pattern = r'borderColor":\s*\[(.*?)\]'
         
@@ -191,6 +190,9 @@ if source_data is not None:
         grouping_method = "Provider"
 
     display_legend = st.checkbox("Display legend", value=display_legend)
+
+    # Add this to define `html_type`
+    html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0)
 
     if st.button("Generate HTML"):
         datasets = []
@@ -375,4 +377,3 @@ if source_data is not None:
             file_name="vpn_speed_comparison.html",
             mime="text/html"
         )
-
