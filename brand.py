@@ -61,15 +61,13 @@ def extract_colors_from_html(html_content):
         st.error(f"Failed to extract colors from HTML: {e}")
         return [], []
 
-# Function to extract VPN provider from the HTML content
-def extract_vpn_provider_from_html(html_content):
-    st.write("Scanning HTML for VPN provider names...")
-    for provider in vpn_colors.keys():
-        if provider.lower() in html_content.lower():
-            st.write(f"Found VPN provider: {provider}")
-            return provider
-    st.write("No known VPN provider found in HTML.")
-    return None
+# Function to extract VPN provider from the chart data
+def extract_vpn_provider_from_data(chart_data):
+    st.write("Extracting VPN provider from chart data...")
+    # The provider name is stored in the keys of the 'data' field in chart_data
+    provider_name = list(chart_data["data"].keys())[0]  # This should give us 'PureVPN'
+    st.write(f"Detected provider from chart data: {provider_name}")
+    return provider_name
 
 # Updated function to update the existing chart
 def update_chart(chart_html, source_data, label_column, value_columns):
@@ -79,18 +77,14 @@ def update_chart(chart_html, source_data, label_column, value_columns):
     if chart_data:
         st.write("Loaded chart data from HTML.")
 
-        # Extract the VPN provider name from the HTML
-        provider_name = extract_vpn_provider_from_html(chart_html)
+        # Extract the VPN provider name from the chart data itself
+        provider_name = extract_vpn_provider_from_data(chart_data)
         
-        if not provider_name:
-            st.error("No known VPN provider found. Default colors will be used.")
-            provider_name = "default"
-
         # The test labels like "Speed test: UK (a.m.)", "Speed test: UK (noon)"
-        labels = list(chart_data["data"].values())[0].keys()
+        labels = list(chart_data["data"][provider_name].keys())  # These are test labels
         datasets = [{"label": provider_name, "data": list(chart_data["data"][provider_name].values())}]
         
-        st.write(f"Chart labels: {labels}")
+        st.write(f"Chart labels (test names): {labels}")
         st.write(f"Provider name: {provider_name}")
         st.write(f"Chart datasets: {datasets}")
 
@@ -105,7 +99,7 @@ def update_chart(chart_html, source_data, label_column, value_columns):
                 dataset["backgroundColor"] = background_colors
                 st.write(f"Using extracted background colors: {background_colors}")
             else:
-                # Assign colors based on the provider found in the HTML
+                # Force color assignment based on the detected provider
                 dataset["backgroundColor"] = [get_provider_color(provider_name)] * len(dataset["data"])
                 st.write(f"Using provider color for {provider_name}: {dataset['backgroundColor']}")
 
@@ -125,6 +119,7 @@ def update_chart(chart_html, source_data, label_column, value_columns):
         source_data = pd.DataFrame(data_dict)
         st.write("Updated Data Preview:")
         source_data = st.data_editor(source_data)
+
 
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
