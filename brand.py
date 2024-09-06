@@ -62,35 +62,42 @@ def extract_colors_from_html(html_content):
         return [], []
 
 # Function to update existing chart
-# Function to update existing chart
 def update_chart(chart_html, source_data, label_column, value_columns):
     st.write("Updating chart with HTML content...")
     chart_data = load_chart_data_from_html(chart_html)
+    
     if chart_data:
         st.write("Loaded chart data from HTML.")
-        labels = list(chart_data["data"].values())[0].keys()  # These are the test names like "Speed test: UK (a.m.)"
-        provider_name = list(chart_data["data"].keys())[0]  # This is the VPN provider name like "PureVPN"
+
+        # The test labels like "Speed test: UK (a.m.)", "Speed test: UK (noon)"
+        labels = list(chart_data["data"].values())[0].keys()
+        
+        # The provider name like "PureVPN"
+        provider_name = list(chart_data["data"].keys())[0]
+        
+        # The datasets for the chart, we use the provider_name as the label and the test results as data
         datasets = [{"label": provider_name, "data": list(chart_data["data"][provider_name].values())}]
-
+        
         st.write(f"Chart labels (test names): {labels}")
-        st.write(f"Chart datasets: {datasets}")
         st.write(f"Provider name: {provider_name}")
+        st.write(f"Chart datasets: {datasets}")
 
-        # Extract and apply colors
+        # Extract and apply colors from the HTML if they exist
         background_colors, border_colors = extract_colors_from_html(chart_html)
-
+        
         for dataset in datasets:
             st.write(f"Processing dataset for provider: {provider_name}")
-
-            # Use the provider name for color assignment, not the test label
+            
+            # Use the extracted background colors if available
             if background_colors:
                 dataset["backgroundColor"] = background_colors
                 st.write(f"Using extracted background colors: {background_colors}")
             else:
-                # Assign color based on the VPN provider (PureVPN in this case)
+                # If not, assign colors based on the provider (PureVPN)
                 dataset["backgroundColor"] = [get_provider_color(provider_name)] * len(dataset["data"])
                 st.write(f"Using provider color for {provider_name}: {dataset['backgroundColor']}")
 
+            # Use the extracted border colors if available
             if border_colors:
                 dataset["borderColor"] = border_colors
                 st.write(f"Using extracted border colors: {border_colors}")
