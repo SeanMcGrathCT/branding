@@ -19,7 +19,7 @@ vpn_colors = {
     'strongvpn': 'rgba(238, 170, 29, 0.8)'
 }
 
-# Define nice colors for test types
+# Define default colors for test types
 nice_colors = [
     'rgba(255, 99, 132, 0.8)',
     'rgba(54, 162, 235, 0.8)',
@@ -39,7 +39,8 @@ def get_provider_color(provider_name):
         return color
     st.write(f"Provider name not a string: {provider_name}")
     return 'rgba(75, 192, 192, 0.8)'
-    
+
+# Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
         st.write("Extracting colors from HTML...")
@@ -63,8 +64,7 @@ def extract_colors_from_html(html_content):
 # Function to extract VPN provider from the chart data
 def extract_vpn_provider_from_data(chart_data):
     st.write("Extracting VPN provider from chart data...")
-    # The provider name is stored in the keys of the 'data' field in chart_data
-    provider_name = list(chart_data["data"].keys())[0]  # This should give us 'PureVPN'
+    provider_name = list(chart_data["data"].keys())[0]
     st.write(f"Detected provider from chart data: {provider_name}")
     return provider_name
 
@@ -98,7 +98,6 @@ def update_chart(chart_html, source_data, label_column, value_columns):
                 dataset["backgroundColor"] = background_colors
                 st.write(f"Using extracted background colors: {background_colors}")
             else:
-                # Force color assignment based on the detected provider
                 dataset["backgroundColor"] = [get_provider_color(provider_name)] * len(dataset["data"])
                 st.write(f"Using provider color for {provider_name}: {dataset['backgroundColor']}")
 
