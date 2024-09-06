@@ -293,7 +293,7 @@ if source_data is not None:
                         beginAtZero: {str(chart_type != 'Radar Chart').lower()},
                         title: {{
                             display: true,
-                            text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
+                            text: '{y_axis_label}'
                         }}
                     }}
                 }}
