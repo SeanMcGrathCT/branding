@@ -181,99 +181,23 @@ if source_data is not None:
 
     if st.button("Generate HTML"):
         datasets = []
-        null_value = 0.05  
-        if chart_type == "Scatter Chart":
-            labels = []
-            x_values = []
-            y_values = []
-            for provider in source_data[label_column].unique():
-                provider_data = source_data[source_data[label_column] == provider]
-                try:
-                    x_val = float(provider_data[x_column].values[0])
-                    y_val = float(provider_data[y_column].values[0])
-                    x_values.append(x_val)
-                    y_values.append(y_val)
-                    scatter_data = [{'x': x_val, 'y': y_val}]
-                    background_colors = [get_provider_color(provider)]
-                    border_colors = background_colors
-                    datasets.append({
-                        'label': provider,
-                        'data': scatter_data,
-                        'backgroundColor': background_colors,
-                        'borderColor': border_colors,
-                        'borderWidth': 1,
-                        'showLine': False
-                    })
-                except ValueError as e:
-                    st.error(f"Error converting values to float for provider '{provider}': {e}")
-                    continue
-            if x_values and y_values:
-                x_min, x_max = min(x_values), max(x_values)
-                y_min, y_max = min(y_values), max(y_values)
-        elif chart_type == "Radar Chart":
-            labels = value_columns
-            for provider in source_data[label_column].unique():
-                provider_data = source_data[source_data[label_column] == provider]
-                data = [
-                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
-                    for col in value_columns
-                    if pd.api.types.is_numeric_dtype(source_data[col])
-                ]
-                background_colors = get_provider_color(provider)
-                border_colors = background_colors
-                datasets.append({
-                    'label': provider,
-                    'data': data,
-                    'backgroundColor': background_colors,
-                    'borderColor': border_colors,
-                    'borderWidth': 1
-                })
-        elif grouping_method == "Provider":
-            labels = list(value_columns)
-            unique_providers = source_data[label_column].unique()
-            for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
-                data = [
-                    float(provider_data[col].values[0].split(' ')[0]) if isinstance(provider_data[col].values[0], str) else provider_data[col].values[0]
-                    for col in value_columns
-                    if pd.api.types.is_numeric_dtype(source_data[col])
-                ]
-                background_colors = [
-                    get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)'
-                    for col in value_columns
-                ]
-                border_colors = background_colors
-                datasets.append({
-                    'label': provider,
-                    'data': data,
-                    'backgroundColor': background_colors,
-                    'borderColor': border_colors,
-                    'borderWidth': 1
-                })
-        else:
-            labels = source_data[label_column].tolist()
-            color_index = 0
-            for col in value_columns:
-                values = [
-                    float(value.split(' ')[0]) if isinstance(value, str) and ' ' in value else value
-                    for value in source_data[col].tolist()
-                    if pd.api.types.is_numeric_dtype(source_data[col])
-                ]
-                background_colors = [
-                    nice_colors[color_index % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)'
-                    for value in values
-                ]
-                border_colors = background_colors
-                datasets.append({
-                    'label': col,
-                    'data': values,
-                    'backgroundColor': background_colors,
-                    'borderColor': border_colors,
-                    'borderWidth': 1
-                })
-                color_index += 1
+        labels = list(value_columns)
+        unique_providers = source_data[label_column].unique()
+        color_index = 0
+        
+        for provider in unique_providers:
+            provider_data = source_data[source_data[label_column] == provider]
+            data = [float(provider_data[col].values[0]) for col in value_columns]
+            background_colors = [get_provider_color(provider)] * len(value_columns)
+            border_colors = background_colors
+            datasets.append({
+                'label': provider,
+                'data': data,
+                'backgroundColor': background_colors,
+                'borderColor': border_colors,
+                'borderWidth': 1
+            })
 
-        # Escape special characters in seo_title and unique_id
         seo_title_escaped = json.dumps(seo_title)
         unique_id_safe = re.sub(r'[^a-zA-Z0-9_]', '_', generate_unique_id(seo_title))
 
@@ -319,9 +243,6 @@ if source_data is not None:
                                 if (context.raw <= {null_value * 1.1}) {{
                                     return '{empty_bar_text}';
                                 }}
-                                if (context.raw && context.raw.x !== undefined && context.raw.y !== undefined) {{
-                                    return context.dataset.label + ': (' + context.raw.x + ', ' + context.raw.y + ')';
-                                }}
                                 return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
                             }}
                         }}
@@ -329,21 +250,17 @@ if source_data is not None:
                 }},
                 scales: {{
                     x: {{
-                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {(x_min - 1) if chart_type == 'Scatter Chart' else 'null'},
-                        max: {(x_max + 1) if chart_type == 'Scatter Chart' else 'null'},
+                        beginAtZero: true,
                         title: {{
                             display: true,
-                            text: '{x_column if chart_type == 'Scatter Chart' else ''}'
+                            text: ''
                         }}
                     }},
                     y: {{
-                        beginAtZero: {str(chart_type != 'Radar Chart').lower()},
-                        min: {(y_min - 5) if chart_type == 'Scatter Chart' else 'null'},
-                        max: {(y_max + 5) if chart_type == 'Scatter Chart' else 'null'},
+                        beginAtZero: true,
                         title: {{
                             display: true,
-                            text: '{y_column if chart_type == 'Scatter Chart' else y_axis_label}'
+                            text: '{y_axis_label}'
                         }}
                     }}
                 }}
