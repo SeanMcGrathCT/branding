@@ -120,7 +120,28 @@ def update_chart(chart_html, source_data, label_column, value_columns):
         st.write("Updated Data Preview:")
         source_data = st.data_editor(source_data)
 
-
+# Function to load chart data from HTML
+def load_chart_data_from_html(html_content):
+    try:
+        st.write("Loading chart data from HTML...")
+        start_marker = '<script type="application/ld+json">'
+        end_marker = '</script>'
+        start = html_content.find(start_marker)
+        end = html_content.find(end_marker, start)
+        if start == -1 or end == -1:
+            raise ValueError("Could not find the JSON data section in the provided HTML content.")
+        
+        json_data = html_content[start+len(start_marker):end].strip()
+        data = json.loads(json_data)
+        st.write(f"Loaded data: {data}")
+        return data
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to parse JSON data from HTML content: {e}")
+        return None
+    except ValueError as e:
+        st.error(e)
+        return None
+        
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
     unique_id = title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
