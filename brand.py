@@ -160,28 +160,6 @@ def generate_metadata(seo_title, seo_description, source_data, label_column, val
     }
     return metadata
 
-# Function to load chart data from HTML
-def load_chart_data_from_html(html_content):
-    try:
-        st.write("Loading chart data from HTML...")
-        start_marker = '<script type="application/ld+json">'
-        end_marker = '</script>'
-        start = html_content.find(start_marker)
-        end = html_content.find(end_marker, start)
-        if start == -1 or end == -1:
-            raise ValueError("Could not find the JSON data section in the provided HTML content.")
-        
-        json_data = html_content[start+len(start_marker):end].strip()
-        data = json.loads(json_data)
-        st.write(f"Loaded data: {data}")
-        return data
-    except json.JSONDecodeError as e:
-        st.error(f"Failed to parse JSON data from HTML content: {e}")
-        return None
-    except ValueError as e:
-        st.error(e)
-        return None
-
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
 
