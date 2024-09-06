@@ -41,6 +41,7 @@ def get_provider_color(provider_name):
     return 'rgba(75, 192, 192, 0.8)'
 
 # Function to extract colors from existing chart data in HTML
+# Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
         background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
@@ -56,6 +57,40 @@ def extract_colors_from_html(html_content):
     except Exception as e:
         st.error(f"Failed to extract colors from HTML: {e}")
         return [], []
+
+# Function to update existing chart
+def update_chart(chart_html, source_data, label_column, value_columns):
+    # Load the existing chart data from HTML
+    chart_data = load_chart_data_from_html(chart_html)
+    if chart_data:
+        labels = list(chart_data["data"].values())[0].keys()
+        datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
+
+        # Extract and apply colors
+        background_colors, border_colors = extract_colors_from_html(chart_html)
+
+        for dataset in datasets:
+            provider_name = dataset["label"].lower()
+
+            # Apply extracted colors or use provider colors if available
+            dataset["backgroundColor"] = background_colors if background_colors else [get_provider_color(provider_name)] * len(dataset["data"])
+            dataset["borderColor"] = border_colors if border_colors else dataset["backgroundColor"]
+
+        # Display updated data and colors
+        data_dict = {label_column: labels}
+        for dataset in datasets:
+            data_dict[dataset["label"]] = dataset["data"]
+
+        source_data = pd.DataFrame(data_dict)
+        st.write("Updated Data Preview:")
+        source_data = st.data_editor(source_data)
+
+# Streamlit UI for updating existing chart
+if action == "Update Existing Chart":
+    chart_html = st.text_area("Paste the HTML content of the existing chart:")
+    if chart_html:
+        # Update chart based on the HTML content and apply the provider colors
+        update_chart(chart_html, source_data, label_column, value_columns)
 
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
