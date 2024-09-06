@@ -31,14 +31,19 @@ nice_colors = [
 
 # Function to assign colors based on provider names
 def get_provider_color(provider_name):
+    st.write(f"Getting color for provider: {provider_name}")
     if isinstance(provider_name, str):
         provider_name = provider_name.lower()
-        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+        color = vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
+        st.write(f"Assigned color: {color}")
+        return color
+    st.write(f"Provider name not a string: {provider_name}")
     return 'rgba(75, 192, 192, 0.8)'
 
 # Function to extract colors from existing chart data in HTML
 def extract_colors_from_html(html_content):
     try:
+        st.write("Extracting colors from HTML...")
         background_color_pattern = r'backgroundColor":\s*\[(.*?)\]'
         border_color_pattern = r'borderColor":\s*\[(.*?)\]'
         
@@ -48,6 +53,9 @@ def extract_colors_from_html(html_content):
         background_colors = re.findall(r'rgba?\([^\)]+\)', background_colors_match.group(1)) if background_colors_match else []
         border_colors = re.findall(r'rgba?\([^\)]+\)', border_colors_match.group(1)) if border_colors_match else []
 
+        st.write(f"Extracted background colors: {background_colors}")
+        st.write(f"Extracted border colors: {border_colors}")
+        
         return background_colors, border_colors
     except Exception as e:
         st.error(f"Failed to extract colors from HTML: {e}")
@@ -55,21 +63,37 @@ def extract_colors_from_html(html_content):
 
 # Function to update existing chart
 def update_chart(chart_html, source_data, label_column, value_columns):
-    # Load the existing chart data from HTML
+    st.write("Updating chart with HTML content...")
     chart_data = load_chart_data_from_html(chart_html)
     if chart_data:
+        st.write("Loaded chart data from HTML.")
         labels = list(chart_data["data"].values())[0].keys()
         datasets = [{"label": k, "data": list(v.values())} for k, v in chart_data["data"].items()]
+
+        st.write(f"Chart labels: {labels}")
+        st.write(f"Chart datasets: {datasets}")
 
         # Extract and apply colors
         background_colors, border_colors = extract_colors_from_html(chart_html)
 
         for dataset in datasets:
             provider_name = dataset["label"].lower()
-
+            st.write(f"Processing dataset for provider: {provider_name}")
+            
             # Apply extracted colors or use provider colors if available
-            dataset["backgroundColor"] = background_colors if background_colors else [get_provider_color(provider_name)] * len(dataset["data"])
-            dataset["borderColor"] = border_colors if border_colors else dataset["backgroundColor"]
+            if background_colors:
+                dataset["backgroundColor"] = background_colors
+                st.write(f"Using extracted background colors: {background_colors}")
+            else:
+                dataset["backgroundColor"] = [get_provider_color(provider_name)] * len(dataset["data"])
+                st.write(f"Using default provider color for {provider_name}: {dataset['backgroundColor']}")
+            
+            if border_colors:
+                dataset["borderColor"] = border_colors
+                st.write(f"Using extracted border colors: {border_colors}")
+            else:
+                dataset["borderColor"] = dataset["backgroundColor"]
+                st.write(f"Using default border color: {dataset['borderColor']}")
 
         # Display updated data and colors
         data_dict = {label_column: labels}
@@ -101,6 +125,7 @@ def generate_metadata(seo_title, seo_description, source_data, label_column, val
 # Function to load chart data from HTML
 def load_chart_data_from_html(html_content):
     try:
+        st.write("Loading chart data from HTML...")
         start_marker = '<script type="application/ld+json">'
         end_marker = '</script>'
         start = html_content.find(start_marker)
@@ -110,6 +135,7 @@ def load_chart_data_from_html(html_content):
         
         json_data = html_content[start+len(start_marker):end].strip()
         data = json.loads(json_data)
+        st.write(f"Loaded data: {data}")
         return data
     except json.JSONDecodeError as e:
         st.error(f"Failed to parse JSON data from HTML content: {e}")
