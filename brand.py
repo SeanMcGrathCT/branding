@@ -10,7 +10,7 @@ vpn_colors = {
     'surfshark': 'rgba(30, 191, 191, 0.8)',
     'expressvpn': 'rgba(218, 57, 64, 0.8)',
     'ipvanish': 'rgba(112, 187, 68, 0.8)',
-    'cyberghost': 'rgba(255, 204, 0, 0.8)',
+    'cyberghost': 'rgba(255, 204, 0.8)',
     'purevpn': 'rgba(133, 102, 231, 0.8)',
     'protonvpn': 'rgba(109, 74, 255, 0.8)',
     'privatevpn': 'rgba(159, 97, 185, 0.8)',
@@ -60,7 +60,7 @@ def preprocess_chart_data(chart_data):
     st.write(df)
     return df
 
-# Function to load chart data from HTML
+# Function to load chart data from HTML and extract title, description, and size
 def load_chart_data_from_html(html_content):
     try:
         st.write("Loading chart data from HTML...")
@@ -88,20 +88,6 @@ def load_chart_data_from_html(html_content):
     except ValueError as e:
         st.error(e)
         return None, None, None
-
-# Streamlit UI adjustments for chart size
-if source_data is not None:
-    # Define sizes for "Small", "Medium", and "Full Width"
-    size_mapping = {
-        "Full Width": (805, 600),
-        "Medium": (605, 450),
-        "Small": (405, 400)
-    }
-    
-    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
-
-    # Assign chart dimensions based on selection
-    chart_width, chart_height = size_mapping.get(chart_size, (805, 600))
 
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
@@ -141,23 +127,32 @@ grouping_method = "Provider"
 display_legend = True
 source_data = None
 
+# Handle "Create New Chart" action
 if action == "Create New Chart":
     uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv")
     if uploaded_file is not None:
         source_data = pd.read_csv(uploaded_file)
         st.write("Data Preview:")
         source_data = st.data_editor(source_data)
+
+# Handle "Update Existing Chart" action
 elif action == "Update Existing Chart":
     chart_html = st.text_area("Paste the HTML content of the existing chart:")
     if chart_html:
-        chart_data = load_chart_data_from_html(chart_html)
+        chart_data, seo_title, seo_description = load_chart_data_from_html(chart_html)
         if chart_data:
             # Preprocess the chart data to ensure consistent structure
             source_data = preprocess_chart_data(chart_data)
             st.write("Data Preview:")
             source_data = st.data_editor(source_data)
 
+# If source data is available, proceed to chart creation options
 if source_data is not None:
+    # SEO title and description
+    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title if action == "Update Existing Chart" else "VPN Speed Comparison")
+    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description if action == "Update Existing Chart" else "This chart compares VPN speeds.")
+
+    # Select chart type
     chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
     
     if not source_data.empty:
@@ -167,27 +162,35 @@ if source_data is not None:
         
         value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
 
-    seo_title = st.text_input("Enter the SEO title for the chart:", "VPN Speed Comparison")
-    seo_description = st.text_area("Enter the SEO description for the chart:", "This chart compares VPN speeds.")
-
+    # Chart settings
     y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
     measurement_unit = st.text_input("Enter the measurement unit:", "Mbps")
+    
+    # Chart size options
+    size_mapping = {
+        "Full Width": (805, 600),
+        "Medium": (605, 450),
+        "Small": (405, 400)
+    }
     chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
+    chart_width, chart_height = size_mapping.get(chart_size, (805, 600))
 
-    # Correctly handle grouping by provider or test type
+    # Correctly handle grouping by provider or test type for grouped bar charts
     if chart_type == "Grouped Bar Chart":
         grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
 
+    # Option to display legend
     display_legend = st.checkbox("Display legend", value=True)
 
     # Add this to define `html_type`
     html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=0)
 
+    # Generate HTML button
     if st.button("Generate HTML"):
         datasets = []
-        null_value = 0.05  
+        null_value = 0.05  # Represents an empty or invalid data point for tooltips
         
-        # Handle grouping by Provider or Test Type
+        # Handle grouping by Provider or Test Type for bar charts
         if grouping_method == "Provider":
             labels = list(value_columns)
             unique_providers = source_data[label_column].unique()
@@ -251,6 +254,7 @@ if source_data is not None:
 
         metadata = generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit)
 
+        # Generate HTML content
         html_content = f"""
 <div id="{unique_id_safe}" style="max-width: {chart_width}px; margin: 0 auto;">
     <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id_safe}" width="{chart_width}" height="{chart_height}"></canvas>
@@ -321,6 +325,7 @@ if source_data is not None:
 </script>
 """
 
+        # Provide download button for the generated HTML
         st.download_button(
             label="Download HTML",
             data=html_content,
