@@ -73,14 +73,35 @@ def load_chart_data_from_html(html_content):
         
         json_data = html_content[start+len(start_marker):end].strip()
         data = json.loads(json_data)
-        st.write(f"Loaded data: {data}")
-        return data
+
+        # Extract title and description from the JSON metadata
+        seo_title = data.get("name", "VPN Speed Comparison")
+        seo_description = data.get("description", "This chart compares VPN speeds.")
+
+        st.write(f"Loaded SEO Title: {seo_title}")
+        st.write(f"Loaded SEO Description: {seo_description}")
+
+        return data, seo_title, seo_description
     except json.JSONDecodeError as e:
         st.error(f"Failed to parse JSON data from HTML content: {e}")
-        return None
+        return None, None, None
     except ValueError as e:
         st.error(e)
-        return None
+        return None, None, None
+
+# Streamlit UI adjustments for chart size
+if source_data is not None:
+    # Define sizes for "Small", "Medium", and "Full Width"
+    size_mapping = {
+        "Full Width": (805, 600),
+        "Medium": (605, 450),
+        "Small": (405, 400)
+    }
+    
+    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"])
+
+    # Assign chart dimensions based on selection
+    chart_width, chart_height = size_mapping.get(chart_size, (805, 600))
 
 # Function to generate a unique ID for the chart
 def generate_unique_id(title):
