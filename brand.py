@@ -19,18 +19,42 @@ client = gspread.authorize(creds)
 
 # Define sheet URLs
 sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
-sheet2_url = 'https://docs.google.com/spreadsheets/d/1V2p0XcGSEYDJHWCL9HsNKRRvfGRvrR-7Tr4kUQVIsfk'
 
-# Open sheets
+# Open the Google Sheet
 sheet1 = client.open_by_url(sheet1_url)
-sheet2 = client.open_by_url(sheet2_url)
 
 # List of ignored tabs
 ignored_tabs = ['tables', 'Master', 'admin-prov-scores', 'admin-prov-scores_round', 'admin-global', 
                 'Features Matrix', 'Index', 'Consolidated', 'Pages']
 
-# Cache to store sheet data
-cached_sheet_data = {}
+# Function to find the correct tab based on the URL in A1
+def find_tab_by_url(sheet, url):
+    for worksheet in sheet.worksheets():
+        if worksheet.title not in ignored_tabs:
+            # Get the value in cell A1 of the current worksheet
+            a1_value = worksheet.acell('A1').value
+            if a1_value and a1_value.strip() == url:
+                return worksheet
+    return None
+
+# User input for the URL
+url = st.text_input("Enter the URL to compare:")
+
+if url:
+    # Find the corresponding tab
+    matching_tab = find_tab_by_url(sheet1, url)
+    
+    if matching_tab:
+        st.write(f"Found matching tab: {matching_tab.title}")
+        # Extract data from the tab (you can add your data extraction logic here)
+        data = matching_tab.get_all_records()  # Example: Get all data as a list of dictionaries
+        df = pd.DataFrame(data)  # Convert to a pandas DataFrame for better manipulation
+
+        # Display the extracted data in Streamlit
+        st.write("Data from the matching tab:")
+        st.dataframe(df)
+    else:
+        st.write("No data available for the provided URL.")
 
 def load_all_tabs_into_memory():
     for worksheet in sheet1.worksheets():
