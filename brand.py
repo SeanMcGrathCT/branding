@@ -7,9 +7,14 @@ import requests
 import json
 import time
 
-# Define Google Sheets access
+# Access the service account credentials from secrets
+credentials_info = st.secrets["gsheet_service_account"]
+
+# Define the scope and load credentials from secrets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('gsheet.json', scope)
+creds = Credentials.from_service_account_info(credentials_info, scopes=scope)
+
+# Authorize client
 client = gspread.authorize(creds)
 
 # Define sheet URLs
@@ -20,8 +25,11 @@ sheet2_url = 'https://docs.google.com/spreadsheets/d/1V2p0XcGSEYDJHWCL9HsNKRRvfG
 sheet1 = client.open_by_url(sheet1_url)
 sheet2 = client.open_by_url(sheet2_url)
 
-# Load ignored tabs and cache sheet data
-ignored_tabs = ['tables', 'Master', 'admin-prov-scores', 'admin-prov-scores_round', 'admin-global', 'Features Matrix', 'Index', 'Consolidated', 'Pages']
+# List of ignored tabs
+ignored_tabs = ['tables', 'Master', 'admin-prov-scores', 'admin-prov-scores_round', 'admin-global', 
+                'Features Matrix', 'Index', 'Consolidated', 'Pages']
+
+# Cache to store sheet data
 cached_sheet_data = {}
 
 def load_all_tabs_into_memory():
