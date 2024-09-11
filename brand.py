@@ -1,294 +1,122 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from bs4 import BeautifulSoup
+import requests
 import json
-import re
-import uuid
+import time
 
-# Define VPN colors with less transparency for a more defined look
-vpn_colors = {
-    'nordvpn': 'rgba(62, 95, 255, 0.8)',
-    'surfshark': 'rgba(30, 191, 191, 0.8)',
-    'expressvpn': 'rgba(218, 57, 64, 0.8)',
-    'ipvanish': 'rgba(112, 187, 68, 0.8)',
-    'cyberghost': 'rgba(255, 204, 0.8)',
-    'purevpn': 'rgba(133, 102, 231, 0.8)',
-    'protonvpn': 'rgba(109, 74, 255, 0.8)',
-    'privatevpn': 'rgba(159, 97, 185, 0.8)',
-    'pia': 'rgba(109, 200, 98, 0.8)',
-    'hotspot shield': 'rgba(109, 192, 250, 0.8)',
-    'strongvpn': 'rgba(238, 170, 29, 0.8)'
-}
+# Define Google Sheets access
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name('gsheet.json', scope)
+client = gspread.authorize(creds)
 
-# Define default colors for test types
-nice_colors = [
-    'rgba(255, 99, 132, 0.8)',
-    'rgba(54, 162, 235, 0.8)',
-    'rgba(255, 206, 86, 0.8)',
-    'rgba(75, 192, 192, 0.8)',
-    'rgba(153, 102, 255, 0.8)',
-    'rgba(255, 159, 64, 0.8)'
-]
+# Define sheet URLs
+sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
+sheet2_url = 'https://docs.google.com/spreadsheets/d/1V2p0XcGSEYDJHWCL9HsNKRRvfGRvrR-7Tr4kUQVIsfk'
 
-# Function to assign colors based on provider names
-def get_provider_color(provider_name):
-    if isinstance(provider_name, str):
-        provider_name = provider_name.lower()
-        return vpn_colors.get(provider_name, 'rgba(75, 192, 192, 0.8)')
-    return 'rgba(75, 192, 192, 0.8)'
+# Open sheets
+sheet1 = client.open_by_url(sheet1_url)
+sheet2 = client.open_by_url(sheet2_url)
 
-# Function to preprocess and structure the chart data uniformly
-def preprocess_chart_data(chart_data):
-    formatted_data = []
-    for provider, tests in chart_data['data'].items():
-        row = {"VPN provider": provider}
-        for test_name, value in tests.items():
-            numeric_value = float(re.sub(r'[^\d.]+', '', value))
-            row[test_name] = numeric_value
-        formatted_data.append(row)
-    
-    df = pd.DataFrame(formatted_data)
-    return df
+# Load ignored tabs and cache sheet data
+ignored_tabs = ['tables', 'Master', 'admin-prov-scores', 'admin-prov-scores_round', 'admin-global', 'Features Matrix', 'Index', 'Consolidated', 'Pages']
+cached_sheet_data = {}
 
-# Function to load chart data from HTML and extract fields
-def load_chart_data_from_html(html_content):
-    try:
-        start_marker = '<script type="application/ld+json">'
-        end_marker = '</script>'
-        start = html_content.find(start_marker)
-        end = html_content.find(end_marker, start)
-        if start == -1 or end == -1:
-            raise ValueError("Could not find the JSON data section in the provided HTML content.")
-        
-        json_data = html_content[start+len(start_marker):end].strip()
-        data = json.loads(json_data)
+def load_all_tabs_into_memory():
+    for worksheet in sheet1.worksheets():
+        if worksheet.title not in ignored_tabs:
+            cached_sheet_data[worksheet.title] = pd.DataFrame(worksheet.get_all_records())
 
-        # Extract title and description
-        seo_title = data.get("name", "VPN Speed Comparison")
-        seo_description = data.get("description", "This chart compares VPN speeds.")
-        
-        # Extract chart dimensions
-        chart_dimensions = re.search(r'width="(\d+)" height="(\d+)"', html_content)
-        if chart_dimensions:
-            width, height = chart_dimensions.groups()
-            chart_width, chart_height = int(width), int(height)
-        else:
-            chart_width, chart_height = 805, 600
-        
-        # Set chart size
-        chart_size = "Full Width" if chart_width == 805 else "Small" if chart_width == 405 else "Medium"
-
-        return data, seo_title, seo_description, chart_width, chart_height, chart_size
-    except json.JSONDecodeError as e:
-        st.error(f"Failed to parse JSON data from HTML content: {e}")
-        return None, None, None, None, None, None
-    except ValueError as e:
-        st.error(e)
-        return None, None, None, None, None, None
-
-# Function to generate a unique ID for the chart
-def generate_unique_id(title):
-    return title.replace(" ", "_").lower() + "_" + uuid.uuid4().hex[:6]
-
-# Function to generate ld+json metadata
-def generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit):
-    data_dict = {provider: {col: f"{source_data.at[source_data[source_data[label_column] == provider].index[0], col]} {measurement_unit}".split(' ')[0] + ' ' + measurement_unit for col in value_columns} for provider in source_data[label_column]}
-    return {
-        "@context": "http://schema.org",
-        "@type": "Dataset",
-        "name": seo_title,
-        "description": seo_description,
-        "data": data_dict
-    }
+# Function to scrape scores from the URL
+def scrape_scores_from_url(url):
+    # Example of scraping logic - can be replaced with actual implementation
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    # Scrape relevant data from the page
+    # Example data structure: {'provider': {'am': 10, 'noon': 20, 'pm': 15, 'Average': 15}}
+    scraped_scores = {}  # Replace with actual scraped data
+    return scraped_scores
 
 # Streamlit UI
 st.title("VPN Speed Comparison Chart Generator")
 
-# Radio button for creating or updating chart
-action = st.radio("Choose an action:", ["Create New Chart", "Update Existing Chart"], key='action_choice')
+# User input for URL
+url = st.text_input("Enter the URL to compare:")
 
-# Initialize variables for form fields
-seo_title = ""
-seo_description = ""
-label_column = ""
-value_columns = []
-measurement_unit = "Mbps"
-empty_bar_text = "No data available"
-chart_size = "Full Width"
-chart_width = 805
-chart_height = 600
-grouping_method = "Provider"
-display_legend = True
-source_data = None
+if url:
+    # Load URL and mapping data from Sheet 2
+    urls_df = pd.DataFrame(sheet2.worksheet('urls').get_all_records())
+    mapping_df = pd.DataFrame(sheet2.worksheet('mapping').get_all_records())
 
-# Handle "Create New Chart" action
-if action == "Create New Chart":
-    uploaded_file = st.file_uploader("Choose a CSV file with source data", type="csv")
-    if uploaded_file is not None:
-        source_data = pd.read_csv(uploaded_file)
-        st.write("Data Preview:")
-        source_data = st.data_editor(source_data)
+    # Scrape scores for the URL
+    scraped_scores = scrape_scores_from_url(url)
 
-# Handle "Update Existing Chart" action
-elif action == "Update Existing Chart":
-    chart_html = st.text_area("Paste the HTML content of the existing chart:")
-    if chart_html:
-        chart_data, seo_title, seo_description, chart_width, chart_height, chart_size = load_chart_data_from_html(chart_html)
-        if chart_data:
-            # Preprocess the chart data to ensure consistent structure
-            source_data = preprocess_chart_data(chart_data)
-            st.write("Data Preview:")
-            source_data = st.data_editor(source_data)
+    # Proceed if scraped scores are available
+    if scraped_scores:
+        # Mapping logic (using the fuzzy matching logic)
+        # Mapping headers would match the scraped scores (e.g., 'am', 'noon', 'pm', 'Average')
+        speed_test_data = {
+            'am': [51.49, 45.63, 40.91, 52.03, 37.15],  # Example data per provider
+            'noon': [50.72, 44.53, 38.91, 49.03, 36.18],
+            'pm': [49.99, 46.13, 42.00, 51.03, 35.21],
+            'Average': [50.74, 45.43, 40.61, 51.69, 36.85]
+        }
 
-            # Offer an option to replace the dataset with new data
-            replace_dataset = st.checkbox("Replace data with a new CSV upload?")
-            if replace_dataset:
-                uploaded_file = st.file_uploader("Upload new CSV file to replace existing data", type="csv")
-                if uploaded_file is not None:
-                    source_data = pd.read_csv(uploaded_file)
-                    st.write("New Data Preview:")
-                    source_data = st.data_editor(source_data)
+        # Generate charts using Chart.js
+        st.write("Generating charts...")
 
-# If source data is available, proceed to chart creation options
-if source_data is not None:
-    # SEO title and description
-    seo_title = st.text_input("Enter the SEO title for the chart:", seo_title)
-    seo_description = st.text_area("Enter the SEO description for the chart:", seo_description)
+        # Example chart data
+        labels = ["UK", "US", "Australia", "Italy", "Brazil"]
+        datasets = [
+            {
+                "label": "NordVPN",
+                "data": [51.49, 45.63, 40.91, 52.03, 37.15],
+                "backgroundColor": "rgba(62, 95, 255, 0.8)",
+                "borderColor": "rgba(31, 47, 127, 0.8)",
+                "borderWidth": 1
+            },
+            # Add other providers similarly
+        ]
 
-    # Select chart type
-    chart_type = st.selectbox("Select the type of chart:", ["Single Bar Chart", "Grouped Bar Chart", "Scatter Chart", "Radar Chart"])
-    
-    if not source_data.empty:
-        label_column = st.selectbox("Select the column for VPN providers:", source_data.columns, key='label_column')
-        valid_columns = list(source_data.columns)
-        default_columns = valid_columns[1:] if len(valid_columns) > 1 else valid_columns
-        value_columns = st.multiselect("Select the columns for tests:", valid_columns, default=default_columns, key='value_columns')
-
-    # Chart settings
-    y_axis_label = st.text_input("Enter the Y axis label:", "Speed (Mbps)")
-    measurement_unit = st.text_input("Enter the measurement unit:", measurement_unit)
-
-    # Chart size options
-    size_mapping = {
-        "Full Width": (805, 600),
-        "Medium": (605, 450),
-        "Small": (405, 400)
-    }
-    chart_size = st.selectbox("Select the chart size:", ["Full Width", "Medium", "Small"], index=["Full Width", "Medium", "Small"].index(chart_size))
-    chart_width, chart_height = size_mapping.get(chart_size, (805, 600))
-
-    # Grouping method for grouped bar charts
-    if chart_type == "Grouped Bar Chart":
-        grouping_method = st.selectbox("Group by Provider or Test Type:", ["Provider", "Test Type"], key='grouping_method')
-
-    # Display legend option
-    display_legend = st.checkbox("Display legend", value=True)
-
-    # HTML type selection - default to "Production"
-    html_type = st.radio("HTML Type:", ["Standalone", "Production"], index=1)
-
-    # Generate HTML button
-    if st.button("Generate HTML"):
-        datasets = []
-        null_value = 0.05  # Represents an empty or invalid data point for tooltips
-        
-        if grouping_method == "Provider":
-            labels = list(value_columns)
-            unique_providers = source_data[label_column].unique()
-            for provider in unique_providers:
-                provider_data = source_data[source_data[label_column] == provider]
-                data = [float(provider_data[col].values[0]) if isinstance(provider_data[col].values[0], (int, float)) else provider_data[col].values[0] for col in value_columns]
-                background_colors = [get_provider_color(provider) if not pd.isna(provider_data[col].values[0]) else 'rgba(169, 169, 169, 0.8)' for col in value_columns]
-                border_colors = background_colors
-                datasets.append({'label': provider, 'data': data, 'backgroundColor': background_colors, 'borderColor': border_colors, 'borderWidth': 1})
-        else:
-            labels = source_data[label_column].tolist()
-            color_index = 0
-            for col in value_columns:
-                values = [float(value) if isinstance(value, (int, float)) else value for value in source_data[col].tolist()]
-                background_colors = [nice_colors[color_index % len(nice_colors)] if not pd.isna(value) else 'rgba(169, 169, 169, 0.8)' for value in values]
-                border_colors = background_colors
-                datasets.append({'label': col, 'data': values, 'backgroundColor': background_colors, 'borderColor': border_colors, 'borderWidth': 1})
-                color_index += 1
-
-        seo_title_escaped = json.dumps(seo_title)
-        unique_id_safe = re.sub(r'[^a-zA-Z0-9_]', '_', generate_unique_id(seo_title))
-
-        metadata = generate_metadata(seo_title, seo_description, source_data, label_column, value_columns, measurement_unit)
-
-        html_content = f"""
-<div id="{unique_id_safe}" style="max-width: {chart_width}px; margin: 0 auto;">
-    <canvas class="jschartgraphic" id="vpnSpeedChart_{unique_id_safe}" width="{chart_width}" height="{chart_height}"></canvas>
-</div>
-"""
-        if html_type == "Standalone":
-            html_content += f"""
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-"""
-
-        html_content += f"""
-<script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('vpnSpeedChart_{unique_id_safe}').getContext('2d');
-        var vpnSpeedChart = new Chart(ctx, {{
-            type: '{'radar' if chart_type == 'Radar Chart' else 'scatter' if chart_type == 'Scatter Chart' else 'bar'}',
-            data: {{
-                labels: {json.dumps(labels)},
-                datasets: {json.dumps(datasets, default=str)}
-            }},
-            options: {{
-                responsive: true,
-                plugins: {{
-                    title: {{
-                        display: true,
-                        text: {seo_title_escaped},
-                        font: {{
-                            size: 18
-                        }}
-                    }},
-                    legend: {{
-                        display: {str(display_legend).lower()}
-                    }},
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                if (context.raw <= {null_value * 1.1}) {{
-                                    return '{empty_bar_text}';
-                                }}
-                                return context.dataset.label + ': ' + context.raw + ' {measurement_unit}';
+        # HTML for Chart.js
+        chart_html = f"""
+        <div style="max-width: 805px; margin: 0 auto;">
+            <canvas id="speedTestResultsChart" width="805" height="600"></canvas>
+        </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {{
+            var ctx = document.getElementById('speedTestResultsChart').getContext('2d');
+            var speedTestResultsChart = new Chart(ctx, {{
+                type: 'bar',
+                data: {{
+                    labels: {json.dumps(labels)},
+                    datasets: {json.dumps(datasets)}
+                }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            max: 60,
+                            title: {{
+                                display: true,
+                                text: 'Download Speed (Mbps)'
                             }}
                         }}
                     }}
-                }},
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        title: {{
-                            display: true,
-                            text: '{y_axis_label}'
-                        }}
-                    }}
                 }}
-            }}
+            }});
         }});
-    }});
-</script>
-<script type="application/ld+json">
-{json.dumps(metadata, indent=4)}
-</script>
-"""
+        </script>
+        """
 
-        # Provide download button for the generated HTML
-        st.download_button(
-            label="Download HTML",
-            data=html_content,
-            file_name="vpn_speed_comparison.html",
-            mime="text/html"
-        )
+        # Display chart in Streamlit
+        st.components.v1.html(chart_html, height=600)
 
-        # Provide download option for .txt format
-        st.download_button(
-            label="Download as .txt",
-            data=html_content,
-            file_name="vpn_speed_comparison.txt",
-            mime="text/plain"
-        )
+        # Provide download buttons for .html and .txt versions
+        st.download_button("Download Chart as HTML", data=chart_html, file_name="vpn_speed_chart.html", mime="text/html")
+        st.download_button("Download Chart as TXT", data=chart_html, file_name="vpn_speed_chart.txt", mime="text/plain")
+    else:
+        st.write("No data available for the provided URL.")
