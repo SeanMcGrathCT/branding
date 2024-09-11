@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from bs4 import BeautifulSoup
-import requests
-import json
 
 # Access the service account credentials from secrets
 credentials_info = st.secrets["gsheet_service_account"]
@@ -28,31 +25,32 @@ sheet2 = client.open_by_url(sheet2_url)
 ignored_tabs = ['tables', 'Master', 'admin-prov-scores', 'admin-prov-scores_round', 'admin-global', 
                 'Features Matrix', 'Index', 'Consolidated', 'Pages']
 
-# Function to find the correct tab based on the URL in A1
-def find_tab_by_url(sheet, url):
+# Cache to store data from Sheet 1
+cached_sheet_data = {}
+
+# Function to load all worksheets into memory and cache them
+def load_all_tabs_into_memory(sheet):
     for worksheet in sheet.worksheets():
         if worksheet.title not in ignored_tabs:
-            # Get the value in cell A1 of the current worksheet
-            a1_value = worksheet.acell('A1').value
-            if a1_value and a1_value.strip() == url:
-                return worksheet
-    return None
+            headers = worksheet.row_values(2)  # Load headers from row 2
+            data = worksheet.get_all_values()[1:]  # Load data, skipping the first row (headers)
+            cached_sheet_data[worksheet.title] = {
+                'headers': headers,
+                'data': data
+            }
 
-# Function to scrape scores from the URL (this is a placeholder, you can add your actual scraping logic)
-def scrape_scores_from_url(url):
-    # Example: You would implement the real scraping logic here
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    scraped_scores = {
-        'am': 50,
-        'noon': 45,
-        'pm': 48,
-        'Average': 47
-    }
-    return scraped_scores
+# Load all data from sheet1 into cache
+load_all_tabs_into_memory(sheet1)
+
+# Function to find the correct tab based on the URL in cached data
+def find_tab_in_cache_by_url(cached_data, url):
+    for tab_name, tab_data in cached_data.items():
+        if tab_data['data'] and tab_data['data'][0][0] == url:  # Assuming the URL is in the first cell of row 2 (A1)
+            return tab_name, tab_data
+    return None, None
 
 # Function to map headers and find relevant data
-def map_headers_and_extract_data(sheet, url):
+def map_headers_and_extract_data(url):
     # Load the 'mapping' tab from sheet2
     mapping_sheet = sheet2.worksheet('mapping')
     mapping_data = pd.DataFrame(mapping_sheet.get_all_records())
@@ -67,14 +65,15 @@ def map_headers_and_extract_data(sheet, url):
         scraped_score_names = filtered_mapping['Scraped Score Name'].tolist()
         mapped_headers = filtered_mapping['Mapped Header'].tolist()
         
-        # Find the correct worksheet in sheet1 using the URL
-        matching_tab = find_tab_by_url(sheet1, url)
+        # Find the correct worksheet in the cached data
+        tab_name, matching_tab_data = find_tab_in_cache_by_url(cached_sheet_data, url)
         
-        if matching_tab:
-            st.write(f"Found matching tab: {matching_tab.title}")
+        if matching_tab_data:
+            st.write(f"Found matching tab: {tab_name}")
             
-            # Get all headers from row 2 in the matching tab
-            headers = matching_tab.row_values(2)
+            # Get the headers and data from the cached tab data
+            headers = matching_tab_data['headers']
+            data = matching_tab_data['data']
             
             # Create a dictionary to map the Mapped Headers to their index positions
             header_indices = {header: index for index, header in enumerate(headers)}
@@ -83,16 +82,16 @@ def map_headers_and_extract_data(sheet, url):
             extracted_data = []
             for mapped_header in mapped_headers:
                 if mapped_header in header_indices:
-                    col_index = header_indices[mapped_header] + 1  # gspread columns are 1-indexed
-                    data_column = matching_tab.col_values(col_index)[1:]  # Skip the header row
+                    col_index = header_indices[mapped_header]
+                    data_column = [row[col_index] for row in data]
                     extracted_data.append((mapped_header, data_column))
 
             # Extract speed test data (assumes 'am', 'noon', and 'pm' are always in headers)
             speed_test_headers = ['am', 'noon', 'pm']
             for speed_header in speed_test_headers:
                 if speed_header in header_indices:
-                    col_index = header_indices[speed_header] + 1
-                    speed_data = matching_tab.col_values(col_index)[1:]
+                    col_index = header_indices[speed_header]
+                    speed_data = [row[col_index] for row in data]
                     extracted_data.append((speed_header, speed_data))
             
             return extracted_data
@@ -111,7 +110,7 @@ url = st.text_input("Enter the URL to compare:")
 
 if url:
     # Get mapping and extract relevant data from the correct tab
-    extracted_data = map_headers_and_extract_data(sheet1, url)
+    extracted_data = map_headers_and_extract_data(url)
     
     if extracted_data:
         # Example chart data using extracted data (you can modify this based on real extracted values)
