@@ -44,6 +44,12 @@ input_url = st.text_input("URL", "")
 
 def process_consolidated_data():
     global chart_js_files
+    input_url = st.text_input("Enter the URL to find the corresponding VPN data:")
+
+    if not input_url:
+        st.write("Please enter a URL to search for.")
+        return  # Exit the function if no URL is entered
+
     provider_names = []  # List to hold unique provider names
     overall_scores_data = {"streaming ability": [], "security & privacy": [], "overall score": []}
     processed_providers = set()  # To avoid duplicates
@@ -63,8 +69,12 @@ def process_consolidated_data():
                 if not provider_row or not provider_row[0].startswith("http") or not provider_row[1]:
                     continue
 
-                url = provider_row[0]
+                url = provider_row[0].strip()
                 provider_name = provider_row[1].strip()
+
+                # Only process the rows where the URL matches the input
+                if input_url != url:
+                    continue  # Skip rows where the URL doesn't match the user input
 
                 if provider_name not in processed_providers:  # Ensure unique providers
                     processed_providers.add(provider_name)
@@ -105,6 +115,51 @@ def process_consolidated_data():
                                 overall_scores_data[col].append(0)  # Handle errors by adding a default value
                         else:
                             overall_scores_data[col].append(0)  # Ensure every provider has a score
+
+    # Generate a single Chart.js for each overall score category for all providers
+    for score_type, scores in overall_scores_data.items():
+        overall_score_chart_js = f"""
+        <div style="max-width: 805px; margin: 0 auto;">
+            <canvas id="{score_type}_Chart" width="805" height="600"></canvas>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {{
+                var ctx = document.getElementById('{score_type}_Chart').getContext('2d');
+                var {score_type}_Chart = new Chart(ctx, {{
+                    type: 'bar',
+                    data: {{
+                        labels: {json.dumps(provider_names)},  # Unique provider names
+                        datasets: [{{
+                            label: 'VPN Providers {score_type.capitalize()}',
+                            data: {json.dumps(scores)},  # Corresponding score data
+                            backgroundColor: {json.dumps(['rgba(62, 95, 255, 0.8)'] * len(provider_names))},
+                            borderColor: {json.dumps(['rgba(31, 47, 127, 0.8)'] * len(provider_names))},
+                            borderWidth: 1
+                        }}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        scales: {{
+                            y: {{
+                                beginAtZero: true,
+                                title: {{
+                                    display: true,
+                                    text: 'Score'
+                                }}
+                            }}
+                        }},
+                        plugins: {{
+                            title: {{
+                                display: true,
+                                text: 'VPN Providers {score_type.capitalize()}'
+                            }}
+                        }}
+                    }}
+                }});
+            }});
+        </script>
+        """
+        chart_js_files.append((f"{score_type}_chart.txt", overall_score_chart_js))
 
     # Generate a single Chart.js for each overall score category for all providers
     for score_type, scores in overall_scores_data.items():
