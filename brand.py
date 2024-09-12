@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+from fuzzywuzzy import fuzz, process
+import json
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Access the service account credentials from secrets
 credentials_info = st.secrets["gsheet_service_account"]
@@ -25,114 +31,58 @@ try:
 except Exception as e:
     st.error(f"Failed to open Google Sheets: {e}")
 
-# List of ignored tabs
-ignored_tabs = ['tables', 'Master', 'admin-prov-scores', 'admin-prov-scores_round', 'admin-global', 
-                'Features Matrix', 'Index', 'Consolidated', 'Pages']
+# Load the 'Consolidated' worksheet from Sheet 1
+consolidated_sheet = sheet1.worksheet('Consolidated')
+consolidated_data = consolidated_sheet.get_all_values()
 
-# Cache to store data from Sheet 1
-cached_sheet_data = {}
+# Load the 'mapping' worksheet from Sheet 2
+mapping_sheet = sheet2.worksheet('mapping')
+mapping_df = pd.DataFrame(mapping_sheet.get_all_records())
 
-# Function to load all worksheets into memory and cache them with detailed logging
-def load_all_tabs_into_memory(sheet):
-    st.write("Starting to load all tabs into memory...")
-    for worksheet in sheet.worksheets():
-        try:
-            st.write(f"Processing worksheet: {worksheet.title}")
-            if worksheet.title not in ignored_tabs:
-                headers = worksheet.row_values(2)  # Load headers from row 2
-                st.write(f"Headers from row 2 of {worksheet.title}: {headers}")
-                
-                # Check if the sheet has data
-                if headers:
-                    data = worksheet.get_all_values()[1:]  # Load data, skipping the first row (headers)
-                    cached_sheet_data[worksheet.title] = {
-                        'headers': headers,
-                        'data': data
-                    }
-                    st.write(f"Successfully cached data from worksheet: {worksheet.title}")
-                else:
-                    st.write(f"No headers found in row 2 of {worksheet.title}. Skipping this sheet.")
-            else:
-                st.write(f"Skipping ignored tab: {worksheet.title}")
-        except gspread.exceptions.APIError as api_error:
-            st.error(f"APIError while processing worksheet {worksheet.title}: {api_error}")
-        except Exception as e:
-            st.error(f"An unexpected error occurred while processing worksheet {worksheet.title}: {e}")
+# Function to match headers with scraped scores using fuzzy matching
+def match_headers_with_scores(cleaned_headers, scraped_score_name):
+    logging.debug(f"\n=== Matching Scraped Score Name: '{scraped_score_name}' ===")
+    
+    # Strip ': overall score' from headers for comparison
+    headers_to_match = [header.replace(": overall score", "").strip().lower() for header in cleaned_headers]
+    
+    # Fuzzy match with an adjustable threshold
+    best_match, best_score = process.extractOne(scraped_score_name.lower(), headers_to_match, scorer=fuzz.ratio)
+    
+    logging.debug(f"Best fuzzy match for '{scraped_score_name}' is '{best_match}' with a score of {best_score}")
+    
+    if best_score >= 70:  # Set a matching threshold
+        return headers_to_match.index(best_match)
+    else:
+        return None
 
-# Load all data from sheet1 into cache
-load_all_tabs_into_memory(sheet1)
+# Function to extract the necessary speed test data for generating charts
+def extract_chart_data(url, consolidated_data, mapping_df):
+    for i, row in enumerate(consolidated_data):
+        if row[0].startswith("http"):  # Check if the row contains a URL
+            if row[0] == url:
+                headers_row = consolidated_data[i + 1]  # The headers are in the next row
+                provider_data = consolidated_data[i + 2:]  # Provider data follows headers
 
-# Function to find the correct tab based on the URL in cached data
-def find_tab_in_cache_by_url(cached_data, url):
-    st.write(f"Searching for URL {url} in cached data...")
-    for tab_name, tab_data in cached_data.items():
-        st.write(f"Checking tab: {tab_name}")
-        try:
-            if tab_data['data'] and tab_data['data'][0][0] == url:  # Assuming the URL is in the first cell of row 2 (A1)
-                st.write(f"Found matching tab for URL {url}: {tab_name}")
-                return tab_name, tab_data
-        except Exception as e:
-            st.error(f"Error while searching in tab {tab_name}: {e}")
-    return None, None
+                # Strip ": overall score" from headers
+                cleaned_headers = [header.replace(": overall score", "").strip().lower() for header in headers_row]
 
-# Function to map headers and find relevant data with logging
-def map_headers_and_extract_data(url):
-    try:
-        st.write(f"Fetching mapping data for URL: {url}")
-        # Load the 'mapping' tab from sheet2
-        mapping_sheet = sheet2.worksheet('mapping')
-        mapping_data = pd.DataFrame(mapping_sheet.get_all_records())
-        
-        # Filter mapping data by the given URL
-        filtered_mapping = mapping_data[mapping_data['URL'] == url]
-        
-        if not filtered_mapping.empty:
-            st.write(f"Found {len(filtered_mapping)} matching rows in the mapping sheet.")
-            
-            # Extract relevant mappings for the given URL
-            scraped_score_names = filtered_mapping['Scraped Score Name'].tolist()
-            mapped_headers = filtered_mapping['Mapped Header'].tolist()
-            
-            # Find the correct worksheet in the cached data
-            tab_name, matching_tab_data = find_tab_in_cache_by_url(cached_sheet_data, url)
-            
-            if matching_tab_data:
-                st.write(f"Found matching tab: {tab_name}")
-                
-                # Get the headers and data from the cached tab data
-                headers = matching_tab_data['headers']
-                data = matching_tab_data['data']
-                
-                # Create a dictionary to map the Mapped Headers to their index positions
-                header_indices = {header: index for index, header in enumerate(headers)}
-                
-                # Extract the data for the matched headers
-                extracted_data = []
-                for mapped_header in mapped_headers:
-                    if mapped_header in header_indices:
-                        col_index = header_indices[mapped_header]
-                        data_column = [row[col_index] for row in data]
-                        extracted_data.append((mapped_header, data_column))
+                # Extract relevant data for this URL
+                matching_providers = mapping_df[mapping_df['URL'] == url]
 
-                # Extract speed test data (assumes 'am', 'noon', and 'pm' are always in headers)
-                speed_test_headers = ['am', 'noon', 'pm']
-                for speed_header in speed_test_headers:
-                    if speed_header in header_indices:
-                        col_index = header_indices[speed_header]
-                        speed_data = [row[col_index] for row in data]
-                        extracted_data.append((speed_header, speed_data))
-                
-                return extracted_data
-            else:
-                st.write("No matching tab found for the provided URL.")
-                return None
-        else:
-            st.write("No data available for the provided URL in the mapping sheet.")
-            return None
-    except gspread.exceptions.APIError as api_error:
-        st.error(f"APIError while fetching mapping data for URL {url}: {api_error}")
-    except Exception as e:
-        st.error(f"An unexpected error occurred while fetching mapping data for URL {url}: {e}")
+                if not matching_providers.empty:
+                    speed_test_data = []
+                    for _, mapping_row in matching_providers.iterrows():
+                        scraped_score_name = mapping_row['Scraped Score Name'].lower()
+                        logging.debug(f"Trying to match scraped score name: {scraped_score_name}")
+
+                        # Match headers with the current scraped score name
+                        matched_header_idx = match_headers_with_scores(cleaned_headers, scraped_score_name)
+
+                        if matched_header_idx is not None:
+                            extracted_value = provider_data[0][matched_header_idx]  # Assuming first provider
+                            speed_test_data.append((mapping_row['Mapped Header'], extracted_value))
+                    return speed_test_data
     return None
 
 # Streamlit UI
@@ -142,22 +92,23 @@ st.title("VPN Speed Comparison Chart Generator")
 url = st.text_input("Enter the URL to compare:")
 
 if url:
-    # Get mapping and extract relevant data from the correct tab
-    extracted_data = map_headers_and_extract_data(url)
+    # Get mapping and extract relevant data for the chart
+    chart_data = extract_chart_data(url, consolidated_data, mapping_df)
     
-    if extracted_data:
-        # Example chart data using extracted data (you can modify this based on real extracted values)
+    if chart_data:
+        # Extract labels and data for the chart (you can modify this based on real extracted values)
         labels = ["UK", "US", "Australia", "Italy", "Brazil"]
-        datasets = [
-            {
-                "label": "NordVPN",
-                "data": [51.49, 45.63, 40.91, 52.03, 37.15],  # Example data, replace with actual extracted data
-                "backgroundColor": "rgba(62, 95, 255, 0.8)",
+        datasets = []
+
+        # Assuming `chart_data` contains tuples of (mapped_header, extracted_value)
+        for i, (label, value) in enumerate(chart_data):
+            datasets.append({
+                "label": label,
+                "data": [float(value)],  # Example data, replace with actual extracted data
+                "backgroundColor": f"rgba(62, 95, 255, 0.{8-i})",  # Dynamic color change
                 "borderColor": "rgba(31, 47, 127, 0.8)",
                 "borderWidth": 1
-            },
-            # Add other providers similarly with the real extracted data
-        ]
+            })
 
         # HTML for Chart.js
         chart_html = f"""
@@ -178,7 +129,6 @@ if url:
                     scales: {{
                         y: {{
                             beginAtZero: true,
-                            max: 60,
                             title: {{
                                 display: true,
                                 text: 'Download Speed (Mbps)'
