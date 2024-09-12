@@ -51,13 +51,13 @@ def process_consolidated_data():
             st.write(f"Found header row at index {i}: {headers_row}")
 
             # Process each provider row after the header row
-            providers_data = consolidated_data[i + 1:]
+            providers_data = consolidated_data[i + 1:]  # Get the rows following the header row
 
             # Process each provider row
             for provider_row in providers_data:
                 # Skip empty rows or rows without URLs or VPN Provider
                 if not provider_row or not provider_row[0].startswith("http") or not provider_row[1]:
-                    break
+                    continue  # Skip rows that aren't valid
 
                 url = provider_row[0]
                 provider_name = provider_row[1].strip()
@@ -73,8 +73,14 @@ def process_consolidated_data():
                     st.write(f"Matched Speed Test Columns: {matched_speed_columns}")
 
                     # Extract speed test data for the provider
-                    speed_test_data = [provider_row[headers_row.index(col)] for col in matched_speed_columns]
-
+                    speed_test_data = []
+                    for col in matched_speed_columns:
+                        try:
+                            score = provider_row[headers_row.index(col)]
+                            speed_test_data.append(float(score))  # Convert to float for chart data
+                        except (ValueError, IndexError):
+                            speed_test_data.append(0)  # If there's an error, default to 0
+                        
                     # Generate Chart.js for speed tests
                     speed_test_chart_js = f"""
                     <div style="max-width: 500px; margin: 0 auto;">
@@ -86,7 +92,7 @@ def process_consolidated_data():
                             var {provider_name}_SpeedChart = new Chart(ctx, {{
                                 type: 'bar',
                                 data: {{
-                                    labels: ['am', 'noon', 'pm'],
+                                    labels: {json.dumps(speed_test_columns)},
                                     datasets: [{{
                                         label: '{provider_name} Speed Test (Mbps)',
                                         data: {json.dumps(speed_test_data)},
@@ -128,7 +134,13 @@ def process_consolidated_data():
                     st.write(f"Matched Overall Score Columns: {matched_overall_columns}")
 
                     # Extract overall score data for the provider
-                    overall_score_data = [provider_row[headers_row.index(col)] for col in matched_overall_columns]
+                    overall_score_data = []
+                    for col in matched_overall_columns:
+                        try:
+                            score = provider_row[headers_row.index(col)]
+                            overall_score_data.append(float(score))  # Convert to float for chart data
+                        except (ValueError, IndexError):
+                            overall_score_data.append(0)  # If there's an error, default to 0
 
                     # Generate Chart.js for overall scores
                     overall_score_chart_js = f"""
