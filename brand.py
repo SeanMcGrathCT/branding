@@ -4,26 +4,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 from fuzzywuzzy import fuzz, process
 import logging
+import json
 
-# Set up logging to display on the console and in Streamlit
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Function to log messages to both the console and Streamlit
-def log_message(level, message):
-    if level == "info":
-        st.write(message)
-        logging.info(message)
-    elif level == "warning":
-        st.warning(message)
-        logging.warning(message)
-    elif level == "error":
-        st.error(message)
-        logging.error(message)
-    elif level == "debug":
-        st.write(message)
-        logging.debug(message)
-
-st.write("Starting VPN Speed Comparison Chart Generator")
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Access the service account credentials from secrets
 credentials_info = st.secrets["gsheet_service_account"]
@@ -35,90 +19,124 @@ creds = Credentials.from_service_account_info(credentials_info, scopes=scope)
 # Authorize client
 client = gspread.authorize(creds)
 
-# Open the Google Sheet
+# Define sheet URLs
 sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
+
+# Open the Google Sheet
 try:
     sheet1 = client.open_by_url(sheet1_url)
-    log_message("info", "Successfully opened the Google Sheet.")
+    st.write("Successfully opened the Google Sheet.")
 except Exception as e:
-    log_message("error", f"Failed to open Google Sheet: {e}")
+    st.error(f"Failed to open Google Sheet: {e}")
 
-# Load the 'Consolidated' worksheet
+# Load the 'Consolidated' worksheet from Sheet 1
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
 
-# Log a snippet of the consolidated data to verify it's being loaded
-log_message("debug", f"Consolidated data (first 5 rows): {consolidated_data[:5]}")
+# Display first few rows of consolidated data for debugging
+st.write("Consolidated data (first 5 rows):", consolidated_data[:5])
 
-# Function to extract relevant data for a given URL
-def extract_data_from_consolidated(url, consolidated_data):
-    log_message("info", f"Looking for data for URL: {url}")
+# Sample headers for fuzzy matching reference
+expected_headers = ['am', 'noon', 'pm', 'overall score']
+
+# Function to fuzzy match and interpret headers dynamically
+def find_best_matches(headers_row):
+    normalized_headers = [header.lower() for header in headers_row]
     
-    relevant_data = []  # To store the extracted data
+    matched_headers = {}
+    for expected in expected_headers:
+        best_match, best_score = process.extractOne(expected, normalized_headers, scorer=fuzz.partial_ratio)
+        if best_score > 70:  # Threshold for fuzzy match acceptance
+            matched_headers[expected] = best_match
+        else:
+            logging.warning(f"No good match found for expected header: {expected}")
     
-    for i, row in enumerate(consolidated_data):
-        log_message("debug", f"Checking row {i}: {row}")
+    logging.info(f"Matched headers: {matched_headers}")
+    return matched_headers
+
+# Function to extract provider data based on matched headers
+def extract_provider_data(headers_row, provider_row, matched_headers):
+    extracted_data = {}
+    
+    for key, matched_header in matched_headers.items():
+        try:
+            col_index = headers_row.index(matched_header)
+            extracted_data[key] = provider_row[col_index]
+        except ValueError as e:
+            logging.error(f"Failed to find column for header '{matched_header}' in row: {headers_row}")
+    
+    return extracted_data
+
+# Function to process the data for a given URL
+def process_data_for_url(headers_row, provider_rows):
+    matched_headers = find_best_matches(headers_row)  # Perform fuzzy matching for headers
+    
+    extracted_results = []
+    for provider_row in provider_rows:
+        if not provider_row or not provider_row[0].startswith("http"):  # Skip if no valid URL or provider
+            continue
         
-        if row[0] == url:  # The URL is in the first column
-            log_message("info", f"Found data for URL at row {i}: {row}")
-            
-            # The headers are always in the next row (i + 1)
-            headers_row = consolidated_data[i + 1]
-            provider_data = consolidated_data[i + 2:]  # Provider data follows headers
-
-            log_message("debug", f"Headers for URL {url}: {headers_row}")
-            log_message("debug", f"Provider data for URL {url} (first 3 rows): {provider_data[:3]}")
-
-            # Now we can extract relevant data, assuming 'am', 'noon', and 'pm' are in headers
-            for provider in provider_data:
-                if provider[0] != url:  # If we reach a different URL, stop processing
-                    log_message("debug", f"Reached another URL at row {provider}. Stopping.")
-                    break
-                
-                provider_name = provider[1]  # Assuming provider name is in column B
-                try:
-                    speed_data = {
-                        'provider': provider_name,
-                        'am': provider[headers_row.index('Speed test: UK (a.m.)')],
-                        'noon': provider[headers_row.index('Speed test: UK (noon)')],
-                        'pm': provider[headers_row.index('Speed test: UK (p.m.)')]
-                    }
-                    relevant_data.append(speed_data)
-                except ValueError as ve:
-                    log_message("error", f"Failed to extract data for {provider_name}: {ve}")
-            
-            return headers_row, relevant_data
+        logging.info(f"Processing provider: {provider_row[1]} for URL: {provider_row[0]}")
+        
+        # Extract provider data using the matched headers
+        provider_data = extract_provider_data(headers_row, provider_row, matched_headers)
+        extracted_results.append((provider_row[1], provider_data))
+        logging.info(f"Extracted data: {provider_data}")
     
-    log_message("warning", f"No data found for URL: {url}")
+    return extracted_results
+
+# Function to find the relevant row for the given URL in the consolidated data
+def find_row_for_url(url, consolidated_data):
+    for idx, row in enumerate(consolidated_data):
+        if row[0].startswith(url):
+            logging.info(f"Found data for URL at row {idx}: {row}")
+            return idx, row
     return None, None
 
-# Streamlit UI
+# Function to extract data for chart generation
+def extract_chart_data(url):
+    row_idx, headers_row = None, None
+    for idx, row in enumerate(consolidated_data):
+        if "url" in row[0].lower():  # Identify the header row
+            headers_row = row
+            provider_rows = consolidated_data[idx + 1:]
+            logging.info(f"Headers for URL {url}: {headers_row}")
+        elif row[0].startswith(url):
+            logging.info(f"Found data for URL {url} at row {idx}")
+            row_idx = idx
+            break
+
+    if row_idx is not None and headers_row is not None:
+        return process_data_for_url(headers_row, consolidated_data[row_idx:row_idx + 6])
+    
+    return None
+
+# Streamlit UI for VPN Speed Comparison Chart Generator
 st.title("VPN Speed Comparison Chart Generator")
 
 # User input for URL
 url = st.text_input("Enter the URL to compare:")
 
 if url:
-    # Get mapping and extract relevant data from the correct tab
-    log_message("info", f"Processing URL: {url}")
-    headers_row, chart_data = extract_data_from_consolidated(url, consolidated_data)
+    # Extract relevant data for the entered URL
+    extracted_data = extract_chart_data(url)
     
-    if chart_data:
-        # Example chart data using extracted data (you can modify this based on real extracted values)
-        labels = ["UK", "US", "Australia", "Italy", "Brazil"]  # Modify this based on your headers if necessary
+    if extracted_data:
+        # Prepare data for chart
+        labels = ["UK", "US", "Australia", "Italy", "Brazil"]
         datasets = []
 
-        # Construct dataset for each provider
-        for data in chart_data:
+        for provider, data in extracted_data:
+            speed_data = [data.get('am', 0), data.get('noon', 0), data.get('pm', 0)]  # Example data extraction
             datasets.append({
-                "label": data['provider'],
-                "data": [float(data['am']), float(data['noon']), float(data['pm'])],
+                "label": provider,
+                "data": speed_data,
                 "backgroundColor": "rgba(62, 95, 255, 0.8)",
                 "borderColor": "rgba(31, 47, 127, 0.8)",
                 "borderWidth": 1
             })
 
-        # HTML for Chart.js
+        # Generate chart HTML using Chart.js
         chart_html = f"""
         <div style="max-width: 805px; margin: 0 auto;">
             <canvas id="speedTestResultsChart" width="805" height="600"></canvas>
@@ -152,8 +170,8 @@ if url:
         # Display chart in Streamlit
         st.components.v1.html(chart_html, height=600)
 
-        # Provide download buttons for .html and .txt versions
+        # Provide download buttons for .html and .txt versions of the chart
         st.download_button("Download Chart as HTML", data=chart_html, file_name="vpn_speed_chart.html", mime="text/html")
         st.download_button("Download Chart as TXT", data=chart_html, file_name="vpn_speed_chart.txt", mime="text/plain")
     else:
-        log_message("warning", "No data available for the provided URL.")
+        st.write("No data available for the provided URL.")
