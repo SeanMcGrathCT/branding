@@ -1,81 +1,50 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
 
-# Access the service account credentials from secrets
-credentials_info = st.secrets["gsheet_service_account"]
+# Load the CSV file provided by the user
+file_path = '/mnt/data/VPN Master - page level scoring - Consolidated (2).csv'
+sheet_data = pd.read_csv(file_path)
 
-# Define the scope and load credentials from secrets
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(credentials_info, scopes=scope)
+# Display the raw data structure for reference
+st.write("Raw Data Structure:")
+st.write(sheet_data.head())
 
-# Authorize client
-client = gspread.authorize(creds)
+# Step 1: Rename columns where possible based on the first row
+# The first row contains actual headers for the sheet
+headers = sheet_data.iloc[0]  # First row as column headers
 
-# Open the Google Sheet
-sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
-try:
-    sheet1 = client.open_by_url(sheet1_url)
-    st.success("Successfully opened the Google Sheet.")
-except Exception as e:
-    st.error(f"Failed to open Google Sheet: {e}")
+# Assign new headers to the DataFrame and drop the first row
+sheet_data.columns = headers
+sheet_data = sheet_data.drop(0)
 
-# Load the 'Consolidated' worksheet
-consolidated_sheet = sheet1.worksheet('Consolidated')
-consolidated_data = consolidated_sheet.get_all_values()
+# Step 2: Display the cleaned data with new headers
+st.write("Data after header adjustment:")
+st.write(sheet_data.head())
 
-# Convert the data to a pandas DataFrame
-columns = consolidated_data[0]  # Headers
-rows = consolidated_data[1:]  # Data rows
+# Step 3: Extract relevant columns
+# Identify key columns: URLs, VPN providers, and overall scores
 
-# Basic check: How many rows and columns do we have?
-st.write(f"Loaded {len(rows)} rows and {len(columns)} columns from the sheet.")
+# URLs are in the first column, and VPN providers are in the second column
+url_column = sheet_data.columns[0]
+vpn_column = sheet_data.columns[1]
 
-# Step 1: Basic row-by-row check for problematic data
-# This will print any rows that have potential issues when converting to a DataFrame
-clean_rows = []
-problematic_rows = []
+# Find all columns containing speed test or overall score data
+speed_test_columns = [col for col in sheet_data.columns if 'Speed test' in str(col)]
+overall_score_columns = [col for col in sheet_data.columns if 'Overall Score' in str(col)]
 
-for i, row in enumerate(rows):
-    try:
-        clean_rows.append([str(item) for item in row])  # Convert everything to string
-    except Exception as e:
-        problematic_rows.append((i, row, str(e)))
+# Display the relevant columns to ensure correctness
+st.write("Relevant Columns for Analysis:")
+st.write(f"URL Column: {url_column}")
+st.write(f"VPN Provider Column: {vpn_column}")
+st.write(f"Speed Test Columns: {speed_test_columns}")
+st.write(f"Overall Score Columns: {overall_score_columns}")
 
-# If we found problematic rows, display them
-if problematic_rows:
-    st.write("Found problematic rows:")
-    st.write(problematic_rows)
-else:
-    st.write("No problematic rows found. Proceeding with data conversion.")
+# Step 4: Process the speed test and overall score data for each VPN provider
+# Extract the required data into a new DataFrame for further analysis or charting
+provider_data = sheet_data[[url_column, vpn_column] + speed_test_columns + overall_score_columns]
 
-# Now that we've cleaned the rows, create a DataFrame
-sheet_data = pd.DataFrame(clean_rows, columns=columns)
+# Display the processed data
+st.write("Processed Data (URLs, VPN Providers, Speed Tests, Overall Scores):")
+st.write(provider_data.head())
 
-# Step 2: Display the first 10 rows to ensure it’s loading properly
-try:
-    st.write("First 10 rows of data:")
-    st.write(sheet_data.head(10))  # Display raw data as a table (not Arrow)
-except Exception as e:
-    st.error(f"Error displaying DataFrame: {e}")
-
-# Step 3: Convert columns to string types to ensure compatibility
-sheet_data = sheet_data.astype(str)
-
-# Step 4: Check for object-like columns or problematic columns
-problematic_columns = []
-for column in sheet_data.columns:
-    if sheet_data[column].apply(lambda x: isinstance(x, object)).any():
-        problematic_columns.append(column)
-        st.write(f"Column '{column}' contains object-like data.")
-
-# If problematic columns are found, display a message
-if problematic_columns:
-    st.write(f"These columns may have caused issues: {problematic_columns}")
-else:
-    st.write("No problematic columns found.")
-
-# Step 5: Display the shape and columns
-st.write("Final DataFrame Shape:", sheet_data.shape)
-st.write("Columns:", sheet_data.columns.tolist())
+# Step 5: Further actions can include generating charts or exporting the data
