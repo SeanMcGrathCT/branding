@@ -45,6 +45,10 @@ input_url = st.text_input("URL", "")
 # Function to process the consolidated sheet and map scores
 def process_consolidated_data():
     global chart_js_files
+    provider_names = []
+    overall_scores_data = {"streaming ability": [], "security & privacy": [], "overall score": []}
+    speed_test_data_per_provider = {}
+
     for i, row in enumerate(consolidated_data):
         if row[0].lower() == 'url':  # Check if the row is a header row starting with 'URL'
             headers_row = row
@@ -63,7 +67,7 @@ def process_consolidated_data():
                 provider_name = provider_row[1].strip()
 
                 if url == input_url:
-                    st.write(f"Processing URL: {url} with provider: {provider_name}")
+                    provider_names.append(provider_name)
 
                     # Fuzzy match columns related to speed tests
                     speed_test_columns = ["am", "noon", "pm"]
@@ -73,58 +77,15 @@ def process_consolidated_data():
                     st.write(f"Matched Speed Test Columns: {matched_speed_columns}")
 
                     # Extract speed test data for the provider
-                    speed_test_data = []
+                    provider_speed_data = []
                     for col in matched_speed_columns:
                         try:
                             score = provider_row[headers_row.index(col)]
-                            speed_test_data.append(float(score))  # Convert to float for chart data
+                            provider_speed_data.append(float(score))  # Convert to float for chart data
                         except (ValueError, IndexError):
-                            speed_test_data.append(0)  # If there's an error, default to 0
-                        
-                    # Generate Chart.js for speed tests
-                    speed_test_chart_js = f"""
-                    <div style="max-width: 500px; margin: 0 auto;">
-                        <canvas id="{provider_name}_SpeedChart" width="500" height="300"></canvas>
-                    </div>
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {{
-                            var ctx = document.getElementById('{provider_name}_SpeedChart').getContext('2d');
-                            var {provider_name}_SpeedChart = new Chart(ctx, {{
-                                type: 'bar',
-                                data: {{
-                                    labels: {json.dumps(speed_test_columns)},
-                                    datasets: [{{
-                                        label: '{provider_name} Speed Test (Mbps)',
-                                        data: {json.dumps(speed_test_data)},
-                                        backgroundColor: 'rgba(62, 95, 255, 0.8)',
-                                        borderColor: 'rgba(62, 95, 255, 0.8)',
-                                        borderWidth: 1
-                                    }}]
-                                }},
-                                options: {{
-                                    responsive: true,
-                                    scales: {{
-                                        y: {{
-                                            beginAtZero: true,
-                                            title: {{
-                                                display: true,
-                                                text: 'Speed (Mbps)'
-                                            }}
-                                        }}
-                                    }},
-                                    plugins: {{
-                                        title: {{
-                                            display: true,
-                                            text: '{provider_name} Speed Test (Mbps)'
-                                        }}
-                                    }}
-                                }}
-                            }});
-                        }});
-                    </script>
-                    """
-                    # Add to the list of Chart.js files
-                    chart_js_files.append((f"{provider_name}_speed_chart.txt", speed_test_chart_js))
+                            provider_speed_data.append(0)  # If there's an error, default to 0
+
+                    speed_test_data_per_provider[provider_name] = provider_speed_data
 
                     # Process overall score columns
                     overall_score_columns = ["overall score", "streaming ability", "security & privacy"]
@@ -134,62 +95,103 @@ def process_consolidated_data():
                     st.write(f"Matched Overall Score Columns: {matched_overall_columns}")
 
                     # Extract overall score data for the provider
-                    overall_score_data = []
-                    for col in matched_overall_columns:
-                        try:
-                            score = provider_row[headers_row.index(col)]
-                            overall_score_data.append(float(score))  # Convert to float for chart data
-                        except (ValueError, IndexError):
-                            overall_score_data.append(0)  # If there's an error, default to 0
+                    for idx, col in enumerate(overall_score_columns):
+                        if matched_overall_columns[idx]:
+                            try:
+                                score = provider_row[headers_row.index(matched_overall_columns[idx])]
+                                overall_scores_data[col].append(float(score))  # Convert to float
+                            except (ValueError, IndexError):
+                                overall_scores_data[col].append(0)
 
-                    # Generate Chart.js for overall scores
-                    overall_score_chart_js = f"""
-                    <div style="max-width: 805px; margin: 0 auto;">
-                        <canvas id="{provider_name}_OverallScoreChart" width="805" height="600"></canvas>
-                    </div>
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {{
-                            var ctx = document.getElementById('{provider_name}_OverallScoreChart').getContext('2d');
-                            var {provider_name}_OverallScoreChart = new Chart(ctx, {{
-                                type: 'bar',
-                                data: {{
-                                    labels: {json.dumps(overall_score_columns)},
-                                    datasets: [{{
-                                        label: '{provider_name} Overall Scores',
-                                        data: {json.dumps(overall_score_data)},
-                                        backgroundColor: 'rgba(62, 95, 255, 0.8)',
-                                        borderColor: 'rgba(62, 95, 255, 0.8)',
-                                        borderWidth: 1
-                                    }}]
-                                }},
-                                options: {{
-                                    responsive: true,
-                                    scales: {{
-                                        y: {{
-                                            beginAtZero: true,
-                                            title: {{
-                                                display: true,
-                                                text: 'Score'
-                                            }}
-                                        }}
-                                    }},
-                                    plugins: {{
-                                        title: {{
-                                            display: true,
-                                            text: '{provider_name} Overall Scores'
-                                        }}
-                                    }}
+    # Generate a single Chart.js for each overall score category for all providers
+    for score_type, scores in overall_scores_data.items():
+        overall_score_chart_js = f"""
+        <div style="max-width: 805px; margin: 0 auto;">
+            <canvas id="{score_type}_Chart" width="805" height="600"></canvas>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {{
+                var ctx = document.getElementById('{score_type}_Chart').getContext('2d');
+                var {score_type}_Chart = new Chart(ctx, {{
+                    type: 'bar',
+                    data: {{
+                        labels: {json.dumps(provider_names)},
+                        datasets: [{{
+                            label: 'VPN Providers {score_type.capitalize()}',
+                            data: {json.dumps(scores)},
+                            backgroundColor: {json.dumps(['rgba(62, 95, 255, 0.8)'] * len(provider_names))},
+                            borderColor: {json.dumps(['rgba(31, 47, 127, 0.8)'] * len(provider_names))},
+                            borderWidth: 1
+                        }}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        scales: {{
+                            y: {{
+                                beginAtZero: true,
+                                title: {{
+                                    display: true,
+                                    text: 'Score'
                                 }}
-                            }});
-                        }});
-                    </script>
-                    """
-                    # Add to the list of Chart.js files
-                    chart_js_files.append((f"{provider_name}_overall_score_chart.txt", overall_score_chart_js))
+                            }}
+                        }},
+                        plugins: {{
+                            title: {{
+                                display: true,
+                                text: 'VPN Providers {score_type.capitalize()}'
+                            }}
+                        }}
+                    }}
+                }});
+            }});
+        </script>
+        """
+        chart_js_files.append((f"{score_type}_chart.txt", overall_score_chart_js))
 
-    # If no files were generated, log a message
-    if not chart_js_files:
-        st.write("No Chart.js files were generated. Please check the data.")
+    # Generate individual speed charts per provider
+    for provider_name, speed_data in speed_test_data_per_provider.items():
+        speed_test_chart_js = f"""
+        <div style="max-width: 500px; margin: 0 auto;">
+            <canvas id="{provider_name}_SpeedChart" width="500" height="300"></canvas>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {{
+                var ctx = document.getElementById('{provider_name}_SpeedChart').getContext('2d');
+                var {provider_name}_SpeedChart = new Chart(ctx, {{
+                    type: 'bar',
+                    data: {{
+                        labels: {json.dumps(speed_test_columns)},
+                        datasets: [{{
+                            label: '{provider_name} Speed Test (Mbps)',
+                            data: {json.dumps(speed_data)},
+                            backgroundColor: 'rgba(62, 95, 255, 0.8)',
+                            borderColor: 'rgba(62, 95, 255, 0.8)',
+                            borderWidth: 1
+                        }}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        scales: {{
+                            y: {{
+                                beginAtZero: true,
+                                title: {{
+                                    display: true,
+                                    text: 'Speed (Mbps)'
+                                }}
+                            }}
+                        }},
+                        plugins: {{
+                            title: {{
+                                display: true,
+                                text: '{provider_name} Speed Test (Mbps)'
+                            }}
+                        }}
+                    }}
+                }});
+            }});
+        </script>
+        """
+        chart_js_files.append((f"{provider_name}_speed_chart.txt", speed_test_chart_js))
 
 # Run the data processing
 process_consolidated_data()
