@@ -5,7 +5,8 @@ from google.oauth2.service_account import Credentials
 import io
 import zipfile
 import json
-from fuzzywuzzy import process
+from fuzzywuzzy import fuzz, process
+import logging
 
 # Step 1: Set up Google Sheets access
 credentials_info = st.secrets["gsheet_service_account"]
@@ -21,170 +22,180 @@ sheet1 = client.open_by_url(sheet1_url)
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
 
-# Convert the sheet data to a DataFrame
-columns = consolidated_data[0]  # Header row
-rows = consolidated_data[1:]  # Data rows
-sheet_data = pd.DataFrame(rows, columns=columns)
+# Initialize a batch for updates
+chart_js_files = []
+
+# Function to match headers with fuzzy matching
+def match_headers_with_scores(cleaned_headers, target_keyword):
+    # Strip ': overall score' from headers for comparison
+    headers_to_match = [header.replace(": overall score", "").strip().lower() for header in cleaned_headers]
+
+    # Fuzzy match with an adjustable threshold
+    best_match, best_score = process.extractOne(target_keyword.lower(), headers_to_match, scorer=fuzz.ratio)
+
+    if best_score >= 70:  # Set a matching threshold
+        return cleaned_headers[headers_to_match.index(best_match)]
+    else:
+        return None
 
 # Step 2: Prompt the user for a URL
 st.write("Enter the URL to find the corresponding VPN data:")
 input_url = st.text_input("URL", "")
 
-# Step 3: Search for the URL in the dataset
-if input_url:
-    matching_rows = sheet_data[sheet_data[sheet_data.columns[0]] == input_url]
+# Function to process the consolidated sheet and map scores
+def process_consolidated_data():
+    global chart_js_files
+    for i, row in enumerate(consolidated_data):
+        if row[0].lower() == 'url':  # Check if the row is a header row starting with 'URL'
+            headers_row = row
+            st.write(f"Found header row at index {i}: {headers_row}")
 
-    if not matching_rows.empty:
-        st.write(f"Data found for URL: {input_url}")
+            # Process each provider row after the header row
+            providers_data = consolidated_data[i + 1:]
 
-        # Step 4: Debugging: Print the column names to check their structure
-        st.write("Available Columns:")
-        st.write(sheet_data.columns.tolist())
+            # Clean headers for fuzzy matching
+            cleaned_headers = [header.replace(": overall score", "").strip().lower() for header in headers_row]
 
-        # Extract the VPN provider column and relevant speed test and overall score columns
-        vpn_column = sheet_data.columns[1]  # VPN provider column
-        providers = matching_rows[vpn_column].unique()  # Unique VPN providers for the given URL
+            # Process each provider row
+            for provider_row in providers_data:
+                # Skip empty rows or rows without URLs or VPN Provider
+                if not provider_row or not provider_row[0].startswith("http") or not provider_row[1]:
+                    break
 
-        # Use fuzzy matching to find the speed test columns (like 'UK (a.m.)', 'UK (noon)', 'UK (p.m.)')
-        speed_test_keywords = ["am", "noon", "pm"]
-        speed_test_columns = []
+                url = provider_row[0]
+                provider_name = provider_row[1].strip()
 
-        for keyword in speed_test_keywords:
-            match, score = process.extractOne(keyword, sheet_data.columns)
-            if score > 80:  # Only accept matches with a high score
-                speed_test_columns.append(match)
+                if url == input_url:
+                    st.write(f"Processing URL: {url} with provider: {provider_name}")
 
-        st.write(f"Matched Speed Test Columns: {speed_test_columns}")
+                    # Fuzzy match columns related to speed tests
+                    speed_test_columns = ["am", "noon", "pm"]
+                    matched_speed_columns = [match_headers_with_scores(cleaned_headers, col) for col in speed_test_columns]
+                    matched_speed_columns = [col for col in matched_speed_columns if col]  # Filter out None
 
-        # Use fuzzy matching to find the overall score columns
-        overall_score_keywords = ["Overall Score", "Streaming Ability", "Security & Privacy"]
-        overall_score_columns = []
+                    st.write(f"Matched Speed Test Columns: {matched_speed_columns}")
 
-        for keyword in overall_score_keywords:
-            match, score = process.extractOne(keyword, sheet_data.columns)
-            if score > 80:
-                overall_score_columns.append(match)
+                    # Extract speed test data for the provider
+                    speed_test_data = [provider_row[headers_row.index(col)] for col in matched_speed_columns]
 
-        st.write(f"Matched Overall Score Columns: {overall_score_columns}")
-
-        # List to store Chart.js code
-        chart_js_files = []
-
-        # Generate individual speed test charts for each provider
-        for provider in providers:
-            provider_data = matching_rows[matching_rows[vpn_column] == provider]
-
-            # Check if speed test columns were found, and extract the data
-            if speed_test_columns:
-                speed_test_data = provider_data[speed_test_columns].astype(float).values.flatten().tolist()
-
-                # Generate Chart.js code for the provider's speed test
-                speed_test_chart_js = f"""
-                <div style="max-width: 500px; margin: 0 auto;">
-                    <canvas id="{provider}_SpeedChart" width="500" height="300"></canvas>
-                </div>
-                <script>
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        var ctx = document.getElementById('{provider}_SpeedChart').getContext('2d');
-                        var {provider}_SpeedChart = new Chart(ctx, {{
-                            type: 'bar',
-                            data: {{
-                                labels: {json.dumps(speed_test_keywords)},
-                                datasets: [{{
-                                    label: '{provider} Speed Test (Mbps)',
-                                    data: {json.dumps(speed_test_data)},
-                                    backgroundColor: 'rgba(62, 95, 255, 0.8)',
-                                    borderColor: 'rgba(62, 95, 255, 0.8)',
-                                    borderWidth: 1
-                                }}]
-                            }},
-                            options: {{
-                                responsive: true,
-                                scales: {{
-                                    y: {{
-                                        beginAtZero: true,
+                    # Generate Chart.js for speed tests
+                    speed_test_chart_js = f"""
+                    <div style="max-width: 500px; margin: 0 auto;">
+                        <canvas id="{provider_name}_SpeedChart" width="500" height="300"></canvas>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {{
+                            var ctx = document.getElementById('{provider_name}_SpeedChart').getContext('2d');
+                            var {provider_name}_SpeedChart = new Chart(ctx, {{
+                                type: 'bar',
+                                data: {{
+                                    labels: ['am', 'noon', 'pm'],
+                                    datasets: [{{
+                                        label: '{provider_name} Speed Test (Mbps)',
+                                        data: {json.dumps(speed_test_data)},
+                                        backgroundColor: 'rgba(62, 95, 255, 0.8)',
+                                        borderColor: 'rgba(62, 95, 255, 0.8)',
+                                        borderWidth: 1
+                                    }}]
+                                }},
+                                options: {{
+                                    responsive: true,
+                                    scales: {{
+                                        y: {{
+                                            beginAtZero: true,
+                                            title: {{
+                                                display: true,
+                                                text: 'Speed (Mbps)'
+                                            }}
+                                        }}
+                                    }},
+                                    plugins: {{
                                         title: {{
                                             display: true,
-                                            text: 'Speed (Mbps)'
+                                            text: '{provider_name} Speed Test (Mbps)'
                                         }}
                                     }}
-                                }},
-                                plugins: {{
-                                    title: {{
-                                        display: true,
-                                        text: '{provider} Speed Test (Mbps)'
-                                    }}
                                 }}
-                            }}
+                            }});
                         }});
-                    }});
-                </script>
-                """
-                # Add the Chart.js code for the provider's speed test to the list
-                chart_js_files.append((f"{provider}_speed_chart.txt", speed_test_chart_js))
+                    </script>
+                    """
+                    # Add to the list of Chart.js files
+                    chart_js_files.append((f"{provider_name}_speed_chart.txt", speed_test_chart_js))
 
-        # Generate comparison charts for overall scores across all providers
-        for score_col in overall_score_columns:
-            score_data = matching_rows[[vpn_column, score_col]].dropna()
+                    # Process overall score columns
+                    overall_score_columns = ["overall score", "streaming ability", "security & privacy"]
+                    matched_overall_columns = [match_headers_with_scores(cleaned_headers, col) for col in overall_score_columns]
+                    matched_overall_columns = [col for col in matched_overall_columns if col]  # Filter out None
 
-            # Generate the comparison chart for the score category
-            overall_score_chart_js = f"""
-            <div style="max-width: 805px; margin: 0 auto;">
-                <canvas id="{score_col.replace(' ', '_')}_OverallScoreChart" width="805" height="600"></canvas>
-            </div>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {{
-                    var ctx = document.getElementById('{score_col.replace(' ', '_')}_OverallScoreChart').getContext('2d');
-                    var {score_col.replace(' ', '_')}_OverallScoreChart = new Chart(ctx, {{
-                        type: 'bar',
-                        data: {{
-                            labels: {json.dumps(score_data[vpn_column].tolist())},
-                            datasets: [{{
-                                label: '{score_col}',
-                                data: {json.dumps(score_data[score_col].astype(float).tolist())},
-                                backgroundColor: 'rgba(62, 95, 255, 0.8)',
-                                borderColor: 'rgba(62, 95, 255, 0.8)',
-                                borderWidth: 1
-                            }}]
-                        }},
-                        options: {{
-                            responsive: true,
-                            scales: {{
-                                y: {{
-                                    beginAtZero: true,
-                                    title: {{
-                                        display: true,
-                                        text: 'Score'
+                    st.write(f"Matched Overall Score Columns: {matched_overall_columns}")
+
+                    # Extract overall score data for the provider
+                    overall_score_data = [provider_row[headers_row.index(col)] for col in matched_overall_columns]
+
+                    # Generate Chart.js for overall scores
+                    overall_score_chart_js = f"""
+                    <div style="max-width: 805px; margin: 0 auto;">
+                        <canvas id="{provider_name}_OverallScoreChart" width="805" height="600"></canvas>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {{
+                            var ctx = document.getElementById('{provider_name}_OverallScoreChart').getContext('2d');
+                            var {provider_name}_OverallScoreChart = new Chart(ctx, {{
+                                type: 'bar',
+                                data: {{
+                                    labels: {json.dumps(overall_score_columns)},
+                                    datasets: [{{
+                                        label: '{provider_name} Overall Scores',
+                                        data: {json.dumps(overall_score_data)},
+                                        backgroundColor: 'rgba(62, 95, 255, 0.8)',
+                                        borderColor: 'rgba(62, 95, 255, 0.8)',
+                                        borderWidth: 1
+                                    }}]
+                                }},
+                                options: {{
+                                    responsive: true,
+                                    scales: {{
+                                        y: {{
+                                            beginAtZero: true,
+                                            title: {{
+                                                display: true,
+                                                text: 'Score'
+                                            }}
+                                        }}
+                                    }},
+                                    plugins: {{
+                                        title: {{
+                                            display: true,
+                                            text: '{provider_name} Overall Scores'
+                                        }}
                                     }}
                                 }}
-                            }},
-                            plugins: {{
-                                title: {{
-                                    display: true,
-                                    text: '{score_col}'
-                                }}
-                            }}
-                        }}
-                    }});
-                }});
-            </script>
-            """
-            # Add the Chart.js code for the comparison chart to the list
-            chart_js_files.append((f"{score_col.replace(' ', '_')}_overall_score_chart.txt", overall_score_chart_js))
+                            }});
+                        }});
+                    </script>
+                    """
+                    # Add to the list of Chart.js files
+                    chart_js_files.append((f"{provider_name}_overall_score_chart.txt", overall_score_chart_js))
 
-        # Step 6: Save the generated Chart.js code as .txt files and zip them
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as zf:
-            for filename, content in chart_js_files:
-                zf.writestr(filename, content)
+    # If no files were generated, log a message
+    if not chart_js_files:
+        st.write("No Chart.js files were generated. Please check the data.")
 
-        # Step 7: Provide download button for the zip file
-        st.download_button(
-            label="Download Chart.js Files as ZIP",
-            data=zip_buffer.getvalue(),
-            file_name=f"{input_url.split('/')[-1]}_charts.zip",
-            mime="application/zip"
-        )
+# Run the data processing
+process_consolidated_data()
 
-    else:
-        st.write(f"No data found for URL: {input_url}")
+# Step 3: Provide download button for the zip file
+if chart_js_files:
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        for filename, content in chart_js_files:
+            zf.writestr(filename, content)
+
+    # Provide download button
+    st.download_button(
+        label="Download Chart.js Files as ZIP",
+        data=zip_buffer.getvalue(),
+        file_name=f"{input_url.split('/')[-1]}_charts.zip",
+        mime="application/zip"
+    )
