@@ -2,35 +2,28 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import matplotlib.pyplot as plt
 
-# Access the service account credentials from secrets
+# Step 1: Set up Google Sheets access
 credentials_info = st.secrets["gsheet_service_account"]
-
-# Define the scope and load credentials from secrets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_info(credentials_info, scopes=scope)
 
 # Authorize client
 client = gspread.authorize(creds)
 
-# Open the Google Sheet
+# Load the Google Sheet
 sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
-try:
-    sheet1 = client.open_by_url(sheet1_url)
-    st.success("Successfully opened the Google Sheet.")
-except Exception as e:
-    st.error(f"Failed to open Google Sheet: {e}")
-
-# Load the 'Consolidated' worksheet
+sheet1 = client.open_by_url(sheet1_url)
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
 
-# Step 1: Convert the Google Sheet data to a pandas DataFrame
-columns = consolidated_data[0]  # The first row is the header
-rows = consolidated_data[1:]  # All other rows are data
+# Convert the sheet data to a DataFrame
+columns = consolidated_data[0]  # Header row
+rows = consolidated_data[1:]  # Data rows
 sheet_data = pd.DataFrame(rows, columns=columns)
 
-# Step 2: Handle 'Unnamed' and duplicate columns
+# Clean column names (handle empty or duplicate columns)
 def clean_column_names(columns):
     clean_columns = []
     seen = set()
@@ -41,22 +34,55 @@ def clean_column_names(columns):
         seen.add(col)
     return clean_columns
 
-# Clean the column names
 sheet_data.columns = clean_column_names(sheet_data.columns)
 
-# Step 3: Extract relevant columns for VPN providers, URLs, and speed tests
-url_column = sheet_data.columns[0]  # URL column is the first one
-vpn_column = sheet_data.columns[1]  # VPN provider names are in the second column
+# Step 2: Prompt the user for a URL
+st.write("Enter the URL to find the corresponding VPN data:")
+input_url = st.text_input("URL", "")
 
-# Dynamically find columns related to speed tests and overall scores
-speed_test_columns = [col for col in sheet_data.columns if 'Speed test' in col]
-overall_score_columns = [col for col in sheet_data.columns if 'Overall Score' in col]
+# Step 3: Search for the URL in the dataset
+if input_url:
+    matching_rows = sheet_data[sheet_data[sheet_data.columns[0]] == input_url]
 
-# Step 4: Create a new DataFrame with the relevant columns
-provider_data = sheet_data[[url_column, vpn_column] + speed_test_columns + overall_score_columns]
+    if not matching_rows.empty:
+        st.write(f"Data found for URL: {input_url}")
+        
+        # Extract VPN provider and test results
+        vpn_column = matching_rows[sheet_data.columns[1]].values[0]
+        st.write(f"VPN Provider: {vpn_column}")
+        
+        # Step 4: Find speed test and overall score columns
+        speed_test_columns = [col for col in sheet_data.columns if 'Speed test' in col]
+        overall_score_columns = [col for col in sheet_data.columns if 'Overall Score' in col]
 
-# Step 5: Display the processed data
-st.write("Processed Data (URLs, VPN Providers, Speed Tests, Overall Scores):")
-st.write(provider_data.head())
+        # Extract speed test data
+        speed_test_data = matching_rows[speed_test_columns].astype(float)
+        overall_score_data = matching_rows[overall_score_columns].astype(float)
 
-# Now, you can proceed to generate charts, download the processed data, or any other operation.
+        st.write("Speed Test Data:")
+        st.write(speed_test_data)
+
+        st.write("Overall Score Data:")
+        st.write(overall_score_data)
+
+        # Step 5: Generate Charts
+
+        # Speed Test Chart
+        fig, ax = plt.subplots()
+        ax.bar(speed_test_columns, speed_test_data.values.flatten(), color='skyblue')
+        ax.set_title(f"{vpn_column} - Speed Test Results")
+        ax.set_xlabel("Region")
+        ax.set_ylabel("Speed (Mbps)")
+        st.pyplot(fig)
+
+        # Overall Score Chart
+        fig, ax = plt.subplots()
+        ax.bar(overall_score_columns, overall_score_data.values.flatten(), color='lightcoral')
+        ax.set_title(f"{vpn_column} - Overall Scores")
+        ax.set_xlabel("Metric")
+        ax.set_ylabel("Score")
+        st.pyplot(fig)
+
+    else:
+        st.write(f"No data found for URL: {input_url}")
+
