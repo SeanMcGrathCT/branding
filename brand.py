@@ -6,8 +6,9 @@ from fuzzywuzzy import fuzz, process
 import json
 import logging
 
-# Set up logging
+# Set up logging to display on the console and in Streamlit
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+st.write("Starting VPN Speed Comparison Chart Generator")
 
 # Access the service account credentials from secrets
 credentials_info = st.secrets["gsheet_service_account"]
@@ -28,8 +29,10 @@ try:
     sheet1 = client.open_by_url(sheet1_url)
     sheet2 = client.open_by_url(sheet2_url)
     st.write("Successfully opened both Google Sheets.")
+    logging.info("Successfully opened both Google Sheets.")
 except Exception as e:
     st.error(f"Failed to open Google Sheets: {e}")
+    logging.error(f"Failed to open Google Sheets: {e}")
 
 # Load the 'Consolidated' worksheet from Sheet 1
 consolidated_sheet = sheet1.worksheet('Consolidated')
@@ -54,23 +57,32 @@ def match_headers_with_scores(cleaned_headers, scraped_score_name):
     if best_score >= 70:  # Set a matching threshold
         return headers_to_match.index(best_match)
     else:
+        logging.debug(f"No match found for '{scraped_score_name}' with a score above 70.")
         return None
 
 # Function to extract the necessary speed test data for generating charts
 def extract_chart_data(url, consolidated_data, mapping_df):
+    logging.info(f"Extracting chart data for URL: {url}")
+    
     for i, row in enumerate(consolidated_data):
         if row[0].startswith("http"):  # Check if the row contains a URL
+            logging.debug(f"Checking row {i} for URL match: {row[0]}")
             if row[0] == url:
+                logging.info(f"Found URL match at row {i}: {row[0]}")
+                
                 headers_row = consolidated_data[i + 1]  # The headers are in the next row
                 provider_data = consolidated_data[i + 2:]  # Provider data follows headers
 
                 # Strip ": overall score" from headers
                 cleaned_headers = [header.replace(": overall score", "").strip().lower() for header in headers_row]
+                logging.debug(f"Cleaned headers for URL {url}: {cleaned_headers}")
 
                 # Extract relevant data for this URL
                 matching_providers = mapping_df[mapping_df['URL'] == url]
 
                 if not matching_providers.empty:
+                    logging.info(f"Found {len(matching_providers)} matching providers in the mapping sheet.")
+                    
                     speed_test_data = []
                     for _, mapping_row in matching_providers.iterrows():
                         scraped_score_name = mapping_row['Scraped Score Name'].lower()
@@ -81,8 +93,15 @@ def extract_chart_data(url, consolidated_data, mapping_df):
 
                         if matched_header_idx is not None:
                             extracted_value = provider_data[0][matched_header_idx]  # Assuming first provider
+                            logging.info(f"Match found! {scraped_score_name} -> {cleaned_headers[matched_header_idx]}: {extracted_value}")
                             speed_test_data.append((mapping_row['Mapped Header'], extracted_value))
+                        else:
+                            logging.warning(f"No match found for scraped score name: {scraped_score_name}")
+
                     return speed_test_data
+                else:
+                    logging.warning(f"No matching providers found in the mapping sheet for URL: {url}")
+    logging.warning(f"No matching data found for URL: {url} in the consolidated sheet.")
     return None
 
 # Streamlit UI
@@ -93,6 +112,7 @@ url = st.text_input("Enter the URL to compare:")
 
 if url:
     # Get mapping and extract relevant data for the chart
+    logging.info(f"Processing URL: {url}")
     chart_data = extract_chart_data(url, consolidated_data, mapping_df)
     
     if chart_data:
@@ -149,3 +169,4 @@ if url:
         st.download_button("Download Chart as TXT", data=chart_html, file_name="vpn_speed_chart.txt", mime="text/plain")
     else:
         st.write("No data available for the provided URL.")
+        logging.warning(f"No data available for URL: {url}")
