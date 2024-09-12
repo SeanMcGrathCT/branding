@@ -1,13 +1,8 @@
 import streamlit as st
 import pandas as pd
-import json
-from fuzzywuzzy import process
-import zipfile
-import io
 import gspread
 from google.oauth2.service_account import Credentials
-import streamlit as st
-import pandas as pd
+import numpy as np
 
 # Access the service account credentials from secrets
 credentials_info = st.secrets["gsheet_service_account"]
@@ -36,107 +31,54 @@ columns = consolidated_data[0]  # Headers
 rows = consolidated_data[1:]  # Data rows
 sheet_data = pd.DataFrame(rows, columns=columns)
 
-# Coerce all data to strings to avoid type-related errors
-sheet_data = sheet_data.astype(str)
-
-# Display the shape and first 10 rows of the data to check
+# Step 1: Check for problematic data types and null values
 st.write("Shape of the DataFrame:", sheet_data.shape)
-st.write("Data Types of Each Column:", sheet_data.dtypes)
-st.dataframe(sheet_data.head(10))  # Display first 10 rows
 
+# Show raw data preview (no conversion to Arrow yet)
+st.write("First 10 rows of raw data:")
+st.write(sheet_data.head(10))  # Using st.write() instead of st.dataframe()
 
-# Fuzzy matching function to identify relevant columns
-def fuzzy_match_columns(df, keywords):
-    matched_cols = {}
-    for keyword in keywords:
-        matched_col, score = process.extractOne(keyword, df.columns)
-        if score > 80:  # Threshold for matching
-            matched_cols[keyword] = matched_col
-    return matched_cols
+# Check column data types
+st.write("Column Data Types:")
+st.write(sheet_data.dtypes)
 
-# Define keywords for speed tests and overall score
-speed_test_keywords = ["a.m.", "noon", "p.m.", "average"]
-overall_score_keywords = ["Overall Score"]
+# Show any potential null or missing values in the dataset
+st.write("Missing values in data:")
+st.write(sheet_data.isnull().sum())
 
-# Perform fuzzy matching on columns
-matched_speed_cols = fuzzy_match_columns(sheet_data, speed_test_keywords)
-matched_overall_cols = fuzzy_match_columns(sheet_data, overall_score_keywords)
+# Step 2: Convert all columns to string to avoid mixed data type issues
+sheet_data = sheet_data.applymap(str)
 
-st.write("Matched Speed Test Columns:", matched_speed_cols)
-st.write("Matched Overall Score Columns:", matched_overall_cols)
+# Step 3: Display first 10 rows after type coercion to string
+st.write("First 10 rows after converting all columns to strings:")
+try:
+    st.dataframe(sheet_data.head(10))
+except ValueError as e:
+    st.error(f"Error displaying DataFrame: {e}")
 
-# Function to generate chart.js HTML
-def generate_chart_js(chart_id, labels, dataset, chart_title, y_label):
-    chart_js = f"""
-    <div style="max-width: 500px; margin: 0 auto;">
-        <canvas class='jschartgraphic' id="{chart_id}" width="500" height="300"></canvas>
-    </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {{
-            var ctx = document.getElementById('{chart_id}').getContext('2d');
-            var {chart_id} = new Chart(ctx, {{
-                type: 'bar',
-                data: {{
-                    labels: {json.dumps(labels)},
-                    datasets: [{{
-                        label: '{chart_title}',
-                        data: {json.dumps(dataset)},
-                        backgroundColor: 'rgba(62, 95, 255, 0.8)',
-                        borderColor: 'rgba(62, 95, 255, 0.8)',
-                        borderWidth: 1
-                    }}]
-                }},
-                options: {{
-                    responsive: true,
-                    scales: {{
-                        y: {{
-                            beginAtZero: true,
-                            title: {{
-                                display: true,
-                                text: '{y_label}'
-                            }}
-                        }}
-                    }},
-                    plugins: {{
-                        title: {{
-                            display: true,
-                            text: '{chart_title}'
-                        }}
-                    }}
-                }}
-            }});
-        }});
-    </script>
-    """
-    return chart_js
+# Step 4: Filter out any problematic columns (example based on issues identified in previous step)
+# Here you would identify and add any problematic columns to the list below based on your findings
+problematic_columns = []  # Add problematic columns if needed
 
-# Generate charts for each provider's speed tests
-provider_names = sheet_data['VPN Provider'].unique()
+# Filter out those columns
+if problematic_columns:
+    filtered_data = sheet_data.drop(columns=problematic_columns)
+    st.write(f"Filtered Data (excluding columns {problematic_columns}):")
+    st.dataframe(filtered_data.head(10))
+else:
+    st.write("No problematic columns identified.")
 
-chart_js_files = []
-for provider in provider_names:
-    provider_data = sheet_data[sheet_data['VPN Provider'] == provider]
-    labels = ["UK (a.m.)", "UK (noon)", "UK (p.m.)"]
-    speed_tests = [provider_data[col].values[0] for col in matched_speed_cols.values()]
-    
-    chart_id = f"{provider}_SpeedChart"
-    chart_title = f"{provider} Speed Test (Mbps)"
-    chart_js = generate_chart_js(chart_id, labels, speed_tests, chart_title, "Speed (Mbps)")
-    
-    # Save chart JS to list
-    chart_js_files.append((f"{provider}_speed_chart.txt", chart_js))
+# Step 5: Debugging: If the issue persists, check for object-like cells in columns
+for column in sheet_data.columns:
+    if sheet_data[column].apply(lambda x: isinstance(x, object)).any():
+        st.write(f"Column '{column}' contains object-like data that could cause issues.")
 
-# Generate comparison chart for Overall Scores
-overall_scores = [sheet_data[col].values[0] for col in matched_overall_cols.values()]
-overall_chart_js = generate_chart_js("Overall_Score_Chart", provider_names, overall_scores, "VPN Providers Overall Score", "Score")
+# Step 6: Test with a subset of columns (first 10 columns) to isolate issues
+subset_columns = sheet_data.columns[:10]
+subset_data = sheet_data[subset_columns]
 
-chart_js_files.append(("overall_score_chart.txt", overall_chart_js))
-
-# Zip and download the charts
-if st.button("Download Charts as Zip"):
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zf:
-        for filename, content in chart_js_files:
-            zf.writestr(filename, content)
-    
-    st.download_button(label="Download Zip", data=zip_buffer.getvalue(), file_name="charts.zip", mime="application/zip")
+st.write("Subset of data (first 10 columns):")
+try:
+    st.dataframe(subset_data.head(10))
+except ValueError as e:
+    st.error(f"Error displaying subset DataFrame: {e}")
