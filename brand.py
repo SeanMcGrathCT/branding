@@ -26,19 +26,6 @@ columns = consolidated_data[0]  # Header row
 rows = consolidated_data[1:]  # Data rows
 sheet_data = pd.DataFrame(rows, columns=columns)
 
-# Clean column names (handle empty or duplicate columns)
-def clean_column_names(columns):
-    clean_columns = []
-    seen = set()
-    for i, col in enumerate(columns):
-        if col == '' or col in seen:
-            col = f"Column_{i+1}"  # Assign unique placeholder names to empty or duplicate columns
-        clean_columns.append(col)
-        seen.add(col)
-    return clean_columns
-
-sheet_data.columns = clean_column_names(sheet_data.columns)
-
 # Step 2: Prompt the user for a URL
 st.write("Enter the URL to find the corresponding VPN data:")
 input_url = st.text_input("URL", "")
@@ -54,11 +41,11 @@ if input_url:
         st.write("Available Columns:")
         st.write(sheet_data.columns.tolist())
 
-        # Step 5: Extract speed test data for each VPN provider
+        # Extract the VPN provider column and relevant speed test and overall score columns
         vpn_column = sheet_data.columns[1]  # VPN provider column
         providers = matching_rows[vpn_column].unique()  # Unique VPN providers for the given URL
 
-        # Use fuzzy matching to find the speed test columns (am, noon, pm)
+        # Use fuzzy matching to find the speed test columns (like 'UK (a.m.)', 'UK (noon)', 'UK (p.m.)')
         speed_test_keywords = ["am", "noon", "pm"]
         speed_test_columns = []
 
@@ -69,8 +56,16 @@ if input_url:
 
         st.write(f"Matched Speed Test Columns: {speed_test_columns}")
 
-        # Define the columns for overall scores
-        overall_score_columns = ["Streaming Ability: Overall Score", "UK Speed: Overall Score"]
+        # Use fuzzy matching to find the overall score columns
+        overall_score_keywords = ["Overall Score", "Streaming Ability", "Security & Privacy"]
+        overall_score_columns = []
+
+        for keyword in overall_score_keywords:
+            match, score = process.extractOne(keyword, sheet_data.columns)
+            if score > 80:
+                overall_score_columns.append(match)
+
+        st.write(f"Matched Overall Score Columns: {overall_score_columns}")
 
         # List to store Chart.js code
         chart_js_files = []
