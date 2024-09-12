@@ -6,6 +6,8 @@ import zipfile
 import io
 import gspread
 from google.oauth2.service_account import Credentials
+import streamlit as st
+import pandas as pd
 
 # Access the service account credentials from secrets
 credentials_info = st.secrets["gsheet_service_account"]
@@ -34,9 +36,14 @@ columns = consolidated_data[0]  # Headers
 rows = consolidated_data[1:]  # Data rows
 sheet_data = pd.DataFrame(rows, columns=columns)
 
-# Display the data preview
-st.write("Data Preview")
-st.dataframe(sheet_data)
+# Coerce all data to strings to avoid type-related errors
+sheet_data = sheet_data.astype(str)
+
+# Display the shape and first 10 rows of the data to check
+st.write("Shape of the DataFrame:", sheet_data.shape)
+st.write("Data Types of Each Column:", sheet_data.dtypes)
+st.dataframe(sheet_data.head(10))  # Display first 10 rows
+
 
 # Fuzzy matching function to identify relevant columns
 def fuzzy_match_columns(df, keywords):
