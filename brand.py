@@ -37,6 +37,7 @@ except Exception as e:
 # Load the 'Consolidated' worksheet from Sheet 1
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
+logging.debug(f"Consolidated data loaded: {consolidated_data[:5]}")  # Log the first 5 rows of data
 
 # Load the 'mapping' worksheet from Sheet 2
 mapping_sheet = sheet2.worksheet('mapping')
@@ -65,13 +66,17 @@ def extract_chart_data(url, consolidated_data, mapping_df):
     logging.info(f"Extracting chart data for URL: {url}")
     
     for i, row in enumerate(consolidated_data):
-        if row[0].startswith("http"):  # Check if the row contains a URL
-            logging.debug(f"Checking row {i} for URL match: {row[0]}")
+        logging.debug(f"Checking row {i} with URL: {row[0]}")
+        if row[0].startswith("http"):
+            logging.debug(f"Checking if row matches the URL: {row[0]}")
             if row[0] == url:
                 logging.info(f"Found URL match at row {i}: {row[0]}")
                 
                 headers_row = consolidated_data[i + 1]  # The headers are in the next row
                 provider_data = consolidated_data[i + 2:]  # Provider data follows headers
+
+                logging.debug(f"Headers for URL {url}: {headers_row}")
+                logging.debug(f"Provider data for URL {url}: {provider_data[:3]}")  # Log first 3 rows of provider data
 
                 # Strip ": overall score" from headers
                 cleaned_headers = [header.replace(": overall score", "").strip().lower() for header in headers_row]
@@ -79,6 +84,7 @@ def extract_chart_data(url, consolidated_data, mapping_df):
 
                 # Extract relevant data for this URL
                 matching_providers = mapping_df[mapping_df['URL'] == url]
+                logging.debug(f"Matching providers found: {len(matching_providers)}")
 
                 if not matching_providers.empty:
                     logging.info(f"Found {len(matching_providers)} matching providers in the mapping sheet.")
