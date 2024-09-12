@@ -26,15 +26,15 @@ consolidated_data = consolidated_sheet.get_all_values()
 chart_js_files = []
 
 # Function to match headers with fuzzy matching
-def match_headers_with_scores(cleaned_headers, target_keyword):
+def match_headers_with_scores(headers_row, target_keyword):
     # Strip ': overall score' from headers for comparison
-    headers_to_match = [header.replace(": overall score", "").strip().lower() for header in cleaned_headers]
+    headers_to_match = [header.replace(": overall score", "").strip().lower() for header in headers_row]
 
     # Fuzzy match with an adjustable threshold
     best_match, best_score = process.extractOne(target_keyword.lower(), headers_to_match, scorer=fuzz.ratio)
 
     if best_score >= 70:  # Set a matching threshold
-        return cleaned_headers[headers_to_match.index(best_match)]
+        return headers_row[headers_to_match.index(best_match)]  # Return the exact header from headers_row
     else:
         return None
 
@@ -53,9 +53,6 @@ def process_consolidated_data():
             # Process each provider row after the header row
             providers_data = consolidated_data[i + 1:]
 
-            # Clean headers for fuzzy matching
-            cleaned_headers = [header.replace(": overall score", "").strip().lower() for header in headers_row]
-
             # Process each provider row
             for provider_row in providers_data:
                 # Skip empty rows or rows without URLs or VPN Provider
@@ -70,7 +67,7 @@ def process_consolidated_data():
 
                     # Fuzzy match columns related to speed tests
                     speed_test_columns = ["am", "noon", "pm"]
-                    matched_speed_columns = [match_headers_with_scores(cleaned_headers, col) for col in speed_test_columns]
+                    matched_speed_columns = [match_headers_with_scores(headers_row, col) for col in speed_test_columns]
                     matched_speed_columns = [col for col in matched_speed_columns if col]  # Filter out None
 
                     st.write(f"Matched Speed Test Columns: {matched_speed_columns}")
@@ -125,7 +122,7 @@ def process_consolidated_data():
 
                     # Process overall score columns
                     overall_score_columns = ["overall score", "streaming ability", "security & privacy"]
-                    matched_overall_columns = [match_headers_with_scores(cleaned_headers, col) for col in overall_score_columns]
+                    matched_overall_columns = [match_headers_with_scores(headers_row, col) for col in overall_score_columns]
                     matched_overall_columns = [col for col in matched_overall_columns if col]  # Filter out None
 
                     st.write(f"Matched Overall Score Columns: {matched_overall_columns}")
