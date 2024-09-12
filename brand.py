@@ -1,31 +1,38 @@
 import streamlit as st
 import pandas as pd
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 import json
-from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 import zipfile
 import io
+import gspread
+from google.oauth2.service_account import Credentials
 
-# Google Sheets API setup
-SCOPE = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-SHEET_ID = "1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q"
-RANGE_NAME = "Consolidated!A:Z"
+# Access the service account credentials from secrets
+credentials_info = st.secrets["gsheet_service_account"]
 
-# Function to fetch data from Google Sheets
-def fetch_sheet_data(sheet_id, range_name):
-    credentials = service_account.Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=SCOPE)
-    service = build("sheets", "v4", credentials=credentials)
-    sheet = service.spreadsheets()
-    result = sheet.values().get(spreadsheetId=sheet_id, range=range_name).execute()
-    values = result.get('values', [])
-    
-    return pd.DataFrame(values[1:], columns=values[0])  # Convert to DataFrame
+# Define the scope and load credentials from secrets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = Credentials.from_service_account_info(credentials_info, scopes=scope)
 
-# Fetch Google Sheets data
-sheet_data = fetch_sheet_data(SHEET_ID, RANGE_NAME)
+# Authorize client
+client = gspread.authorize(creds)
+
+# Open the Google Sheet
+sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
+try:
+    sheet1 = client.open_by_url(sheet1_url)
+    st.success("Successfully opened the Google Sheet.")
+except Exception as e:
+    st.error(f"Failed to open Google Sheet: {e}")
+
+# Load the 'Consolidated' worksheet
+consolidated_sheet = sheet1.worksheet('Consolidated')
+consolidated_data = consolidated_sheet.get_all_values()
+
+# Convert the data to a pandas DataFrame
+columns = consolidated_data[0]  # Headers
+rows = consolidated_data[1:]  # Data rows
+sheet_data = pd.DataFrame(rows, columns=columns)
 
 # Display the data preview
 st.write("Data Preview")
@@ -35,7 +42,7 @@ st.dataframe(sheet_data)
 def fuzzy_match_columns(df, keywords):
     matched_cols = {}
     for keyword in keywords:
-        matched_col, score = process.extractOne(keyword, df.columns, scorer=fuzz.partial_ratio)
+        matched_col, score = process.extractOne(keyword, df.columns)
         if score > 80:  # Threshold for matching
             matched_cols[keyword] = matched_col
     return matched_cols
