@@ -7,6 +7,22 @@ import logging
 
 # Set up logging to display on the console and in Streamlit
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Function to log messages to both the console and Streamlit
+def log_message(level, message):
+    if level == "info":
+        st.write(message)
+        logging.info(message)
+    elif level == "warning":
+        st.warning(message)
+        logging.warning(message)
+    elif level == "error":
+        st.error(message)
+        logging.error(message)
+    elif level == "debug":
+        st.write(message)
+        logging.debug(message)
+
 st.write("Starting VPN Speed Comparison Chart Generator")
 
 # Access the service account credentials from secrets
@@ -23,41 +39,39 @@ client = gspread.authorize(creds)
 sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
 try:
     sheet1 = client.open_by_url(sheet1_url)
-    st.write("Successfully opened the Google Sheet.")
-    logging.info("Successfully opened the Google Sheet.")
+    log_message("info", "Successfully opened the Google Sheet.")
 except Exception as e:
-    st.error(f"Failed to open Google Sheet: {e}")
-    logging.error(f"Failed to open Google Sheet: {e}")
+    log_message("error", f"Failed to open Google Sheet: {e}")
 
 # Load the 'Consolidated' worksheet
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
 
-# Display a snippet of the consolidated data to verify
-logging.debug(f"Consolidated data (first 5 rows): {consolidated_data[:5]}")
+# Log a snippet of the consolidated data to verify it's being loaded
+log_message("debug", f"Consolidated data (first 5 rows): {consolidated_data[:5]}")
 
 # Function to extract relevant data for a given URL
 def extract_data_from_consolidated(url, consolidated_data):
-    logging.info(f"Looking for data for URL: {url}")
+    log_message("info", f"Looking for data for URL: {url}")
     
     for i, row in enumerate(consolidated_data):
-        logging.debug(f"Checking row {i}: {row}")
+        log_message("debug", f"Checking row {i}: {row}")
         
         if row[0] == url:  # The URL is in the first column
-            logging.info(f"Found data for URL at row {i}: {row}")
+            log_message("info", f"Found data for URL at row {i}: {row}")
             
             # The headers are always in the next row (i + 1)
             headers_row = consolidated_data[i + 1]
             provider_data = consolidated_data[i + 2:]  # Provider data follows headers
 
-            logging.debug(f"Headers for URL {url}: {headers_row}")
-            logging.debug(f"Provider data for URL {url}: {provider_data[:3]}")  # Log the first 3 rows of provider data
+            log_message("debug", f"Headers for URL {url}: {headers_row}")
+            log_message("debug", f"Provider data for URL {url} (first 3 rows): {provider_data[:3]}")
 
             # Now we can extract relevant data, assuming 'am', 'noon', and 'pm' are in headers
             relevant_data = []
             for provider in provider_data:
-                if provider[0].startswith("http"):  # If we reach the next URL, break the loop
-                    logging.debug(f"Reached another URL at row {provider}. Stopping.")
+                if provider[0].startswith("http"):  # If we reach the next URL, stop processing
+                    log_message("debug", f"Reached another URL at row {provider}. Stopping.")
                     break
                 
                 provider_name = provider[1]  # Assuming provider name is in column B
@@ -70,11 +84,11 @@ def extract_data_from_consolidated(url, consolidated_data):
                     }
                     relevant_data.append(speed_data)
                 except ValueError as ve:
-                    logging.error(f"Failed to extract data for {provider_name}: {ve}")
+                    log_message("error", f"Failed to extract data for {provider_name}: {ve}")
             
             return headers_row, relevant_data
     
-    logging.warning(f"No data found for URL: {url}")
+    log_message("warning", f"No data found for URL: {url}")
     return None, None
 
 # Streamlit UI
@@ -85,7 +99,7 @@ url = st.text_input("Enter the URL to compare:")
 
 if url:
     # Get mapping and extract relevant data from the correct tab
-    logging.info(f"Processing URL: {url}")
+    log_message("info", f"Processing URL: {url}")
     headers_row, chart_data = extract_data_from_consolidated(url, consolidated_data)
     
     if chart_data:
@@ -141,5 +155,4 @@ if url:
         st.download_button("Download Chart as HTML", data=chart_html, file_name="vpn_speed_chart.html", mime="text/html")
         st.download_button("Download Chart as TXT", data=chart_html, file_name="vpn_speed_chart.txt", mime="text/plain")
     else:
-        st.write("No data available for the provided URL.")
-        logging.warning(f"No data available for URL: {url}")
+        log_message("warning", "No data available for the provided URL.")
