@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import numpy as np
 
 # Access the service account credentials from secrets
 credentials_info = st.secrets["gsheet_service_account"]
@@ -29,56 +28,54 @@ consolidated_data = consolidated_sheet.get_all_values()
 # Convert the data to a pandas DataFrame
 columns = consolidated_data[0]  # Headers
 rows = consolidated_data[1:]  # Data rows
-sheet_data = pd.DataFrame(rows, columns=columns)
 
-# Step 1: Check for problematic data types and null values
-st.write("Shape of the DataFrame:", sheet_data.shape)
+# Basic check: How many rows and columns do we have?
+st.write(f"Loaded {len(rows)} rows and {len(columns)} columns from the sheet.")
 
-# Show raw data preview (no conversion to Arrow yet)
-st.write("First 10 rows of raw data:")
-st.write(sheet_data.head(10))  # Using st.write() instead of st.dataframe()
+# Step 1: Basic row-by-row check for problematic data
+# This will print any rows that have potential issues when converting to a DataFrame
+clean_rows = []
+problematic_rows = []
 
-# Check column data types
-st.write("Column Data Types:")
-st.write(sheet_data.dtypes)
+for i, row in enumerate(rows):
+    try:
+        clean_rows.append([str(item) for item in row])  # Convert everything to string
+    except Exception as e:
+        problematic_rows.append((i, row, str(e)))
 
-# Show any potential null or missing values in the dataset
-st.write("Missing values in data:")
-st.write(sheet_data.isnull().sum())
+# If we found problematic rows, display them
+if problematic_rows:
+    st.write("Found problematic rows:")
+    st.write(problematic_rows)
+else:
+    st.write("No problematic rows found. Proceeding with data conversion.")
 
-# Step 2: Convert all columns to string to avoid mixed data type issues
-sheet_data = sheet_data.applymap(str)
+# Now that we've cleaned the rows, create a DataFrame
+sheet_data = pd.DataFrame(clean_rows, columns=columns)
 
-# Step 3: Display first 10 rows after type coercion to string
-st.write("First 10 rows after converting all columns to strings:")
+# Step 2: Display the first 10 rows to ensure it’s loading properly
 try:
-    st.dataframe(sheet_data.head(10))
-except ValueError as e:
+    st.write("First 10 rows of data:")
+    st.write(sheet_data.head(10))  # Display raw data as a table (not Arrow)
+except Exception as e:
     st.error(f"Error displaying DataFrame: {e}")
 
-# Step 4: Filter out any problematic columns (example based on issues identified in previous step)
-# Here you would identify and add any problematic columns to the list below based on your findings
-problematic_columns = []  # Add problematic columns if needed
+# Step 3: Convert columns to string types to ensure compatibility
+sheet_data = sheet_data.astype(str)
 
-# Filter out those columns
-if problematic_columns:
-    filtered_data = sheet_data.drop(columns=problematic_columns)
-    st.write(f"Filtered Data (excluding columns {problematic_columns}):")
-    st.dataframe(filtered_data.head(10))
-else:
-    st.write("No problematic columns identified.")
-
-# Step 5: Debugging: If the issue persists, check for object-like cells in columns
+# Step 4: Check for object-like columns or problematic columns
+problematic_columns = []
 for column in sheet_data.columns:
     if sheet_data[column].apply(lambda x: isinstance(x, object)).any():
-        st.write(f"Column '{column}' contains object-like data that could cause issues.")
+        problematic_columns.append(column)
+        st.write(f"Column '{column}' contains object-like data.")
 
-# Step 6: Test with a subset of columns (first 10 columns) to isolate issues
-subset_columns = sheet_data.columns[:10]
-subset_data = sheet_data[subset_columns]
+# If problematic columns are found, display a message
+if problematic_columns:
+    st.write(f"These columns may have caused issues: {problematic_columns}")
+else:
+    st.write("No problematic columns found.")
 
-st.write("Subset of data (first 10 columns):")
-try:
-    st.dataframe(subset_data.head(10))
-except ValueError as e:
-    st.error(f"Error displaying subset DataFrame: {e}")
+# Step 5: Display the shape and columns
+st.write("Final DataFrame Shape:", sheet_data.shape)
+st.write("Columns:", sheet_data.columns.tolist())
