@@ -41,6 +41,8 @@ def extract_data_from_consolidated(url, consolidated_data):
     logging.info(f"Looking for data for URL: {url}")
     
     for i, row in enumerate(consolidated_data):
+        logging.debug(f"Checking row {i}: {row}")
+        
         if row[0] == url:  # The URL is in the first column
             logging.info(f"Found data for URL at row {i}: {row}")
             
@@ -55,16 +57,20 @@ def extract_data_from_consolidated(url, consolidated_data):
             relevant_data = []
             for provider in provider_data:
                 if provider[0].startswith("http"):  # If we reach the next URL, break the loop
+                    logging.debug(f"Reached another URL at row {provider}. Stopping.")
                     break
                 
                 provider_name = provider[1]  # Assuming provider name is in column B
-                speed_data = {
-                    'provider': provider_name,
-                    'am': provider[headers_row.index('Speed test: UK (a.m.)')],
-                    'noon': provider[headers_row.index('Speed test: UK (noon)')],
-                    'pm': provider[headers_row.index('Speed test: UK (p.m.)')]
-                }
-                relevant_data.append(speed_data)
+                try:
+                    speed_data = {
+                        'provider': provider_name,
+                        'am': provider[headers_row.index('Speed test: UK (a.m.)')],
+                        'noon': provider[headers_row.index('Speed test: UK (noon)')],
+                        'pm': provider[headers_row.index('Speed test: UK (p.m.)')]
+                    }
+                    relevant_data.append(speed_data)
+                except ValueError as ve:
+                    logging.error(f"Failed to extract data for {provider_name}: {ve}")
             
             return headers_row, relevant_data
     
@@ -78,7 +84,7 @@ st.title("VPN Speed Comparison Chart Generator")
 url = st.text_input("Enter the URL to compare:")
 
 if url:
-    # Extract relevant data for the chart
+    # Get mapping and extract relevant data from the correct tab
     logging.info(f"Processing URL: {url}")
     headers_row, chart_data = extract_data_from_consolidated(url, consolidated_data)
     
