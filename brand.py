@@ -54,6 +54,8 @@ log_message("debug", f"Consolidated data (first 5 rows): {consolidated_data[:5]}
 def extract_data_from_consolidated(url, consolidated_data):
     log_message("info", f"Looking for data for URL: {url}")
     
+    relevant_data = []  # To store the extracted data
+    
     for i, row in enumerate(consolidated_data):
         log_message("debug", f"Checking row {i}: {row}")
         
@@ -68,9 +70,8 @@ def extract_data_from_consolidated(url, consolidated_data):
             log_message("debug", f"Provider data for URL {url} (first 3 rows): {provider_data[:3]}")
 
             # Now we can extract relevant data, assuming 'am', 'noon', and 'pm' are in headers
-            relevant_data = []
             for provider in provider_data:
-                if provider[0].startswith("http"):  # If we reach the next URL, stop processing
+                if provider[0] != url:  # If we reach a different URL, stop processing
                     log_message("debug", f"Reached another URL at row {provider}. Stopping.")
                     break
                 
