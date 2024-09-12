@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import matplotlib.pyplot as plt
+import io
+import zipfile
+import json
 
 # Step 1: Set up Google Sheets access
 credentials_info = st.secrets["gsheet_service_account"]
@@ -59,30 +61,80 @@ if input_url:
         speed_test_data = matching_rows[speed_test_columns].astype(float)
         overall_score_data = matching_rows[overall_score_columns].astype(float)
 
-        st.write("Speed Test Data:")
-        st.write(speed_test_data)
+        # Generate Chart.js code for speed tests
+        def generate_chart_js(chart_id, labels, dataset, title, ylabel):
+            chart_js = f"""
+            <div style="max-width: 500px; margin: 0 auto;">
+                <canvas id="{chart_id}" width="500" height="300"></canvas>
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {{
+                    var ctx = document.getElementById('{chart_id}').getContext('2d');
+                    var {chart_id} = new Chart(ctx, {{
+                        type: 'bar',
+                        data: {{
+                            labels: {json.dumps(labels)},
+                            datasets: [{{
+                                label: '{title}',
+                                data: {json.dumps(dataset)},
+                                backgroundColor: 'rgba(62, 95, 255, 0.8)',
+                                borderColor: 'rgba(62, 95, 255, 0.8)',
+                                borderWidth: 1
+                            }}]
+                        }},
+                        options: {{
+                            responsive: true,
+                            scales: {{
+                                y: {{
+                                    beginAtZero: true,
+                                    title: {{
+                                        display: true,
+                                        text: '{ylabel}'
+                                    }}
+                                }}
+                            }},
+                            plugins: {{
+                                title: {{
+                                    display: true,
+                                    text: '{title}'
+                                }}
+                            }}
+                        }}
+                    }});
+                }});
+            </script>
+            """
+            return chart_js
 
-        st.write("Overall Score Data:")
-        st.write(overall_score_data)
+        # Generate Chart.js code for speed test
+        speed_test_labels = speed_test_columns
+        speed_test_dataset = speed_test_data.values.flatten().tolist()
+        speed_test_chart_js = generate_chart_js(f"{vpn_column}_SpeedChart", speed_test_labels, speed_test_dataset, f"{vpn_column} Speed Test (Mbps)", "Speed (Mbps)")
 
-        # Step 5: Generate Charts
+        # Generate Chart.js code for overall scores
+        overall_score_labels = overall_score_columns
+        overall_score_dataset = overall_score_data.values.flatten().tolist()
+        overall_score_chart_js = generate_chart_js(f"{vpn_column}_OverallScoreChart", overall_score_labels, overall_score_dataset, f"{vpn_column} Overall Scores", "Score")
 
-        # Speed Test Chart
-        fig, ax = plt.subplots()
-        ax.bar(speed_test_columns, speed_test_data.values.flatten(), color='skyblue')
-        ax.set_title(f"{vpn_column} - Speed Test Results")
-        ax.set_xlabel("Region")
-        ax.set_ylabel("Speed (Mbps)")
-        st.pyplot(fig)
+        # Step 5: Save the generated Chart.js code as .txt files and zip them
+        chart_js_files = [
+            (f"{vpn_column}_speed_chart.txt", speed_test_chart_js),
+            (f"{vpn_column}_overall_score_chart.txt", overall_score_chart_js)
+        ]
 
-        # Overall Score Chart
-        fig, ax = plt.subplots()
-        ax.bar(overall_score_columns, overall_score_data.values.flatten(), color='lightcoral')
-        ax.set_title(f"{vpn_column} - Overall Scores")
-        ax.set_xlabel("Metric")
-        ax.set_ylabel("Score")
-        st.pyplot(fig)
+        # Create a zip file of the .txt files
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for filename, content in chart_js_files:
+                zf.writestr(filename, content)
+
+        # Step 6: Provide download button for the zip file
+        st.download_button(
+            label="Download Chart.js Files as ZIP",
+            data=zip_buffer.getvalue(),
+            file_name=f"{vpn_column}_charts.zip",
+            mime="application/zip"
+        )
 
     else:
         st.write(f"No data found for URL: {input_url}")
-
