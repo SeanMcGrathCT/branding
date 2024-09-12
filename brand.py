@@ -96,7 +96,7 @@ def process_consolidated_data():
 
                     # Extract overall score data for the provider
                     for idx, col in enumerate(overall_score_columns):
-                        if matched_overall_columns[idx]:
+                        if idx < len(matched_overall_columns) and matched_overall_columns[idx]:
                             try:
                                 score = provider_row[headers_row.index(matched_overall_columns[idx])]
                                 overall_scores_data[col].append(float(score))  # Convert to float
