@@ -5,7 +5,6 @@ from google.oauth2.service_account import Credentials
 import io
 import zipfile
 import json
-import logging
 import uuid  # For generating unique IDs
 import re
 
@@ -51,6 +50,10 @@ def make_title_natural(article_name):
     else:
         return article_name
 
+# Function to sanitize filenames
+def sanitize_filename(filename):
+    return re.sub(r'[^A-Za-z0-9_\-\.]', '_', filename)
+
 # Step 2: Prompt the user for a URL
 st.write("Enter the URL to find the corresponding VPN data:")
 input_url = st.text_input("URL", "")
@@ -78,7 +81,6 @@ if input_url:
                     article_name = 'VPN Analysis'
             else:
                 article_name = 'VPN Analysis'
-            st.write(f"Processing data for article: {article_name}")
 
             headers_row = row
             i += 1  # Move to the next row after the header
@@ -114,7 +116,8 @@ if input_url:
                 unique_provider_key = f"{url}_{provider_name}"
                 if unique_provider_key not in processed_providers:
                     processed_providers.add(unique_provider_key)
-                    provider_names.append(provider_name)  # Add provider name once
+                    if provider_name not in provider_names:
+                        provider_names.append(provider_name)  # Add provider name once
 
                     # Initialize overall_scores_data for new columns
                     for header in matched_overall_columns:
@@ -170,6 +173,8 @@ if input_url:
             # Reset data structures
             processed_providers = set()
             provider_names = []
+            speed_test_data_per_provider = {}
+            overall_scores_data = {}
 
             i = 0
             while i < len(consolidated_data):
@@ -186,7 +191,6 @@ if input_url:
                             article_name = 'VPN Analysis'
                     else:
                         article_name = 'VPN Analysis'
-                    st.write(f"Processing data for article: {article_name}")
 
                     headers_row = row
                     i += 1  # Move to the next row after the header
@@ -284,14 +288,6 @@ if input_url:
                         'hotspot shield': 'rgba(109, 192, 250, 0.8)',
                         'strongvpn': 'rgba(238, 170, 29, 0.8)'
                     }
-                    nice_colors = [
-                        'rgba(255, 99, 132, 0.8)',
-                        'rgba(54, 162, 235, 0.8)',
-                        'rgba(255, 206, 86, 0.8)',
-                        'rgba(75, 192, 192, 0.8)',
-                        'rgba(153, 102, 255, 0.8)',
-                        'rgba(255, 159, 64, 0.8)'
-                    ]
                     provider_color = vpn_colors.get(provider_name.lower(), 'rgba(75, 192, 192, 0.8)')
 
                     # Generate unique IDs
@@ -384,7 +380,8 @@ if input_url:
                     </script>
                     """
 
-                    chart_js_files.append((f"{provider_name}_data_chart.txt", speed_test_chart_js))
+                    filename = sanitize_filename(f"{provider_name}_data_chart.txt")
+                    chart_js_files.append((filename, speed_test_chart_js))
 
             # Generate overall score charts
             if selected_overall_scores:
@@ -500,14 +497,15 @@ if input_url:
                     </script>
                     """
 
-                    chart_js_files.append((f"{score_type}_chart.txt", overall_score_chart_js))
+                    filename = sanitize_filename(f"{score_type}_chart.txt")
+                    chart_js_files.append((filename, overall_score_chart_js))
 
             # Provide download button for the zip file
             if chart_js_files:
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     for filename, content in chart_js_files:
-                        zf.writestr(filename, content)
+                        zf.writestr(filename, content.encode('utf-8'))
 
                 # Provide download button
                 st.download_button(
