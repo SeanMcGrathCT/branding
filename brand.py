@@ -41,8 +41,6 @@ def make_title_natural(article_name):
             if not first_word.endswith('ing'):
                 if first_word.endswith('e'):
                     first_word = first_word[:-1] + 'ing'
-                elif first_word[-1] in ['t', 'p'] and first_word[-2] not in 'aeiou':
-                    first_word = first_word + first_word[-1] + 'ing'  # Double consonant
                 else:
                     first_word = first_word + 'ing'
             words[0] = first_word
@@ -135,6 +133,7 @@ if input_url:
                         except (ValueError, IndexError):
                             score_value = 0  # Handle errors by assigning a default value
 
+                        overall_scores_data[col].setdefault('article_name', article_name)
                         overall_scores_data[col][provider_name] = score_value
 
                     # Store the article name associated with this provider
@@ -256,6 +255,7 @@ if input_url:
 
                                 if col not in overall_scores_data:
                                     overall_scores_data[col] = {}
+                                    overall_scores_data[col]['article_name'] = article_name
                                 overall_scores_data[col][provider_name] = score_value
 
                         i += 1  # Move to next provider row
@@ -308,6 +308,9 @@ if input_url:
 
                     # Generate chart title
                     chart_title = f"{provider_name} Speed Tests for {article_name}"
+
+                    # Generate meta description
+                    meta_description = f"This chart shows the speed test results for {provider_name} when used for {article_name.lower()}."
 
                     # Prepare the chart JS
                     speed_test_chart_js = f"""
@@ -363,7 +366,6 @@ if input_url:
                     """
 
                     # Generate schema data
-                    meta_description = f"This chart shows the speed test results for {provider_name} when used for {article_name.lower()}."
                     data_schema = {
                         "@context": "http://schema.org",
                         "@type": "Dataset",
@@ -384,8 +386,121 @@ if input_url:
 
                     chart_js_files.append((f"{provider_name}_data_chart.txt", speed_test_chart_js))
 
-            # Generate overall score charts (unchanged)
-            # ... [The rest of the script remains the same for overall score charts]
+            # Generate overall score charts
+            if selected_overall_scores:
+                for score_type in selected_overall_scores:
+                    # Prepare data
+                    datasets = []
+                    labels = [score_type]
+                    # Retrieve the article name from overall_scores_data
+                    article_name = overall_scores_data.get(score_type, {}).get('article_name', 'VPN Analysis')
+                    for provider_name in provider_names:
+                        score_value = overall_scores_data.get(score_type, {}).get(provider_name, 0)
+                        # Assign color based on provider name
+                        vpn_colors = {
+                            'nordvpn': 'rgba(62, 95, 255, 0.8)',
+                            'surfshark': 'rgba(30, 191, 191, 0.8)',
+                            'expressvpn': 'rgba(218, 57, 64, 0.8)',
+                            'ipvanish': 'rgba(112, 187, 68, 0.8)',
+                            'cyberghost': 'rgba(255, 204, 0.8)',
+                            'purevpn': 'rgba(133, 102, 231, 0.8)',
+                            'protonvpn': 'rgba(109, 74, 255, 0.8)',
+                            'privatevpn': 'rgba(159, 97, 185, 0.8)',
+                            'pia': 'rgba(109, 200, 98, 0.8)',
+                            'hotspot shield': 'rgba(109, 192, 250, 0.8)',
+                            'strongvpn': 'rgba(238, 170, 29, 0.8)'
+                        }
+                        provider_color = vpn_colors.get(provider_name.lower(), 'rgba(75, 192, 192, 0.8)')
+                        datasets.append({
+                            'label': provider_name,
+                            'data': [score_value],
+                            'backgroundColor': [provider_color],
+                            'borderColor': [provider_color],
+                            'borderWidth': 1
+                        })
+
+                    # Generate unique IDs
+                    chart_id = f"overall_{score_type.replace(' ', '_').lower()}_{uuid.uuid4().hex[:6]}"
+
+                    # Generate chart title
+                    chart_title = f"{score_type} for {article_name}"
+
+                    # Generate meta description
+                    meta_description = f"This chart shows the {score_type.lower()} for each VPN provider when used for {article_name.lower()}."
+
+                    # Prepare the chart JS
+                    overall_score_chart_js = f"""
+                    <div id="{chart_id}" style="max-width: 805px; margin: 0 auto;">
+                        <canvas class="jschartgraphic" id="vpnSpeedChart_{chart_id}" width="805" height="600"></canvas>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {{
+                            var ctx = document.getElementById('vpnSpeedChart_{chart_id}').getContext('2d');
+                            var vpnSpeedChart = new Chart(ctx, {{
+                                type: 'bar',
+                                data: {{
+                                    labels: {json.dumps(labels)},
+                                    datasets: {json.dumps(datasets)}
+                                }},
+                                options: {{
+                                    responsive: true,
+                                    plugins: {{
+                                        title: {{
+                                            display: true,
+                                            text: {json.dumps(chart_title)},
+                                            font: {{
+                                                size: 18
+                                            }}
+                                        }},
+                                        legend: {{
+                                            display: true
+                                        }},
+                                        tooltip: {{
+                                            callbacks: {{
+                                                label: function(context) {{
+                                                    if (context.raw <= 0.05500000000000001) {{
+                                                        return 'No data available';
+                                                    }}
+                                                    return context.dataset.label + ': ' + context.raw + ' Score out of 10';
+                                                }}
+                                            }}
+                                        }}
+                                    }},
+                                    scales: {{
+                                        y: {{
+                                            beginAtZero: true,
+                                            title: {{
+                                                display: true,
+                                                text: 'Score out of 10'
+                                            }}
+                                        }}
+                                    }}
+                                }}
+                            }});
+                        }});
+                    </script>
+                    """
+
+                    # Generate schema data
+                    data_schema = {
+                        "@context": "http://schema.org",
+                        "@type": "Dataset",
+                        "name": chart_title,
+                        "description": meta_description,
+                        "data": {
+                            provider_name: {
+                                labels[0]: f"{overall_scores_data.get(score_type, {}).get(provider_name, 0)} Score out of 10"
+                            } for provider_name in provider_names
+                        }
+                    }
+
+                    overall_score_chart_js += f"""
+                    <script type="application/ld+json">
+                    {json.dumps(data_schema, indent=4)}
+                    </script>
+                    """
+
+                    chart_js_files.append((f"{score_type}_chart.txt", overall_score_chart_js))
 
             # Provide download button for the zip file
             if chart_js_files:
