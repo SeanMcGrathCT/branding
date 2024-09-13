@@ -29,224 +29,281 @@ chart_js_files = []
 def make_title_natural(article_name):
     article_name = article_name.strip()
     if article_name.lower().startswith('how to'):
-        # Remove 'How to' and make the rest more natural
-        title = article_name[6:].capitalize()
-        return f"for {title}"
+        # Remove 'How to' and convert the next verb to gerund form
+        rest = article_name[6:].strip()  # Remove 'How to'
+        # Convert first word to gerund
+        words = rest.split()
+        if words:
+            first_word = words[0]
+            # Simple way to convert to gerund by adding 'ing'
+            # In a real scenario, use nltk or spacy for proper conjugation
+            if not first_word.endswith('ing'):
+                if first_word.endswith('e'):
+                    first_word = first_word[:-1] + 'ing'
+                else:
+                    first_word = first_word + 'ing'
+            words[0] = first_word
+            rest = ' '.join(words)
+        return rest
+    elif article_name.lower().startswith('best '):
+        return article_name  # Keep as is
     else:
         return article_name
 
-# Function to extract data from consolidated sheet and generate charts
-def process_consolidated_data():
-    global chart_js_files
-    overall_scores_data = {}
-    speed_test_data_per_provider = {}
-    article_title = ""
+# Function to sanitize filenames
+def sanitize_filename(name):
+    # Remove invalid characters
+    return re.sub(r'[<>:"/\\|?*]', '', name)
 
-    for i, row in enumerate(consolidated_data):
-        if row[0].lower().startswith('sheet:'):  # Capture the article name from the 'Sheet:' row
-            article_title = make_title_natural(row[0].split(":")[1])
-        elif row[0].lower() == 'url':  # Header row with the relevant columns
-            headers_row = row
-            provider_data = consolidated_data[i + 1:]
-            break  # Exit after we have headers and provider rows
+# Step 2: Prompt the user for a URL
+st.write("Enter the URL to find the corresponding VPN data:")
+input_url = st.text_input("URL", "")
 
-    if not article_title:
-        st.write("No article title found.")
-        return
-
-    # Get list of overall score options
-    overall_score_headers = [header for header in headers_row if 'overall score' in header.lower()]
-    
-    # UI: User selects overall score headers
-    selected_overall_scores = st.multiselect('Select Overall Score categories for export:', overall_score_headers, default=overall_score_headers)
-
-    # If 'Select All' is chosen, select all available overall score headers
-    if st.checkbox('Select All Overall Scores'):
-        selected_overall_scores = overall_score_headers
-
-    # Process each provider row
+if input_url:
+    # Process the data to collect headers and provider names
     provider_names = []
-    for row in provider_data:
-        url = row[0].strip()
-        provider_name = row[1].strip()
-        if provider_name and url.startswith("http"):
-            provider_names.append(provider_name)
-            speed_test_data_per_provider[provider_name] = row
+    overall_scores_data = {}
+    processed_providers = set()
+    speed_test_data_per_provider = {}
+    matching_headers = set()
+    overall_score_headers = set()
+    i = 0
+    while i < len(consolidated_data):
+        row = consolidated_data[i]
+        # Check if the row is a header row starting with 'URL'
+        if row and row[0] and row[0].strip().lower() == 'url':
+            # Extract the article name from the previous row
+            if i > 0:
+                previous_row = consolidated_data[i - 1]
+                if previous_row and previous_row[0].startswith('Sheet:'):
+                    raw_article_name = previous_row[0].replace('Sheet:', '').strip()
+                    article_name = make_title_natural(raw_article_name)
+                else:
+                    article_name = 'VPN Analysis'
+            else:
+                article_name = 'VPN Analysis'
+            st.write(f"Processing data for article: {article_name}")
 
-            # Collect overall score data for selected categories
-            for header in selected_overall_scores:
-                if header not in overall_scores_data:
-                    overall_scores_data[header] = []
-                try:
-                    score = float(row[headers_row.index(header)]) if row[headers_row.index(header)] else 0
-                except ValueError:
-                    score = 0  # Default to 0 if the score cannot be converted to float
-                overall_scores_data[header].append(score)
+            headers_row = row
+            i += 1  # Move to the next row after the header
 
-    # Generate Chart.js code for each overall score
-    for score_type, scores in overall_scores_data.items():
-        unique_id = str(uuid.uuid4().hex[:6])  # Generate unique ID for each chart
-        chart_js = f"""
-        <div id="overall_{score_type.lower().replace(':', '').replace(' ', '_')}_{unique_id}" style="max-width: 805px; margin: 0 auto;">
-            <canvas class="jschartgraphic" id="vpnSpeedChart_overall_{score_type.lower().replace(':', '').replace(' ', '_')}_{unique_id}" width="805" height="600"></canvas>
-        </div>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {{
-                var ctx = document.getElementById('vpnSpeedChart_overall_{score_type.lower().replace(':', '').replace(' ', '_')}_{unique_id}').getContext('2d');
-                var vpnSpeedChart = new Chart(ctx, {{
-                    type: 'bar',
-                    data: {{
-                        labels: {json.dumps(provider_names)},
-                        datasets: [{{
-                            label: 'VPN Providers {score_type}',
-                            data: {json.dumps(scores)},
-                            backgroundColor: {json.dumps(['rgba(62, 95, 255, 0.8)'] * len(provider_names))},
-                            borderColor: {json.dumps(['rgba(31, 47, 127, 0.8)'] * len(provider_names))},
-                            borderWidth: 1
-                        }}]
-                    }},
-                    options: {{
-                        responsive: true,
-                        plugins: {{
-                            title: {{
-                                display: true,
-                                text: "Overall {score_type} {article_title}",
-                                font: {{
-                                    size: 18
-                                }}
-                            }},
-                            legend: {{
-                                display: true
-                            }},
-                            tooltip: {{
-                                callbacks: {{
-                                    label: function(context) {{
-                                        return context.dataset.label + ': ' + context.raw + ' Score out of 10';
-                                    }}
-                                }}
-                            }}
-                        }},
-                        scales: {{
-                            y: {{
-                                beginAtZero: true,
-                                title: {{
-                                    display: true,
-                                    text: 'Score out of 10'
-                                }}
-                            }}
-                        }}
-                    }}
-                }});
-            }});
-        </script>
-        <script type="application/ld+json">
-        {{
-            "@context": "http://schema.org",
-            "@type": "Dataset",
-            "name": "Overall {score_type} {article_title}",
-            "description": "This chart shows the {score_type} for VPN providers {article_title}.",
-            "data": {{
-                {', '.join([f'"{provider_name}": {{"{score_type}": "{scores[i]} out of 10"}}' for i, provider_name in enumerate(provider_names)])}
-            }}
-        }}
-        </script>
-        """
-        chart_js_files.append((f"overall_{score_type.lower().replace(' ', '_')}_chart.txt", chart_js))
+            # Process the data rows until the next header or end of data
+            while i < len(consolidated_data):
+                provider_row = consolidated_data[i]
+                # Check if we've reached the next header row
+                if provider_row and provider_row[0] and provider_row[0].strip().lower() == 'url':
+                    break  # Next header row found, break to process the new dataset
 
-    # Provider-level speed test data generation
-    for provider_name, row in speed_test_data_per_provider.items():
-        unique_id = str(uuid.uuid4().hex[:6])
-        speed_columns = [header for header in headers_row if 'speed test' in header.lower()]
-        provider_speed_data = []
-        for col in speed_columns:
-            try:
-                score = float(row[headers_row.index(col)]) if row[headers_row.index(col)] else 0
-            except ValueError:
-                score = 0  # Default to 0 if the score cannot be converted to float
-            provider_speed_data.append(score)
+                # Skip empty rows or rows without URLs or VPN Provider
+                if not provider_row or len(provider_row) < 2 or not provider_row[0] or not provider_row[1]:
+                    i += 1
+                    continue
 
-        chart_js = f"""
-        <div id="{provider_name.lower().replace(' ', '_')}_speed_chart_{unique_id}" style="max-width: 405px; margin: 0 auto;">
-            <canvas class="jschartgraphic" id="vpnSpeedChart_{provider_name.lower().replace(' ', '_')}_speed_{unique_id}" width="405" height="400"></canvas>
-        </div>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {{
-                var ctx = document.getElementById('vpnSpeedChart_{provider_name.lower().replace(' ', '_')}_speed_{unique_id}').getContext('2d');
-                var vpnSpeedChart = new Chart(ctx, {{
-                    type: 'bar',
-                    data: {{
-                        labels: {json.dumps(speed_columns)},
-                        datasets: [{{
-                            label: '{provider_name} Speed Test (Mbps)',
-                            data: {json.dumps(provider_speed_data)},
-                            backgroundColor: ['rgba(62, 95, 255, 0.8)'],
-                            borderColor: 'rgba(62, 95, 255, 0.8)',
-                            borderWidth: 1
-                        }}]
-                    }},
-                    options: {{
-                        responsive: true,
-                        plugins: {{
-                            title: {{
-                                display: true,
-                                text: "{provider_name} Speed Tests {article_title}",
-                                font: {{
-                                    size: 18
-                                }}
-                            }},
-                            legend: {{
-                                display: true
-                            }},
-                            tooltip: {{
-                                callbacks: {{
-                                    label: function(context) {{
-                                        return context.dataset.label + ': ' + context.raw + ' Mbps';
-                                    }}
-                                }}
-                            }}
-                        }},
-                        scales: {{
-                            y: {{
-                                beginAtZero: true,
-                                title: {{
-                                    display: true,
-                                    text: 'Mbps'
-                                }}
-                            }}
-                        }}
-                    }}
-                }});
-            }});
-        </script>
-        <script type="application/ld+json">
-        {{
-            "@context": "http://schema.org",
-            "@type": "Dataset",
-            "name": "{provider_name} Speed Tests {article_title}",
-            "description": "This chart shows the speed test results for {provider_name} when used {article_title}.",
-            "data": {{
-                {', '.join([f'"{col}": "{provider_speed_data[i]} Mbps"' for i, col in enumerate(speed_columns)])}
-            }}
-        }}
-        </script>
-        """
-        chart_js_files.append((f"{provider_name.lower().replace(' ', '_')}_speed_chart.txt", chart_js))
+                url = provider_row[0].strip()
+                provider_name = provider_row[1].strip()
 
+                # Only process the rows where the URL matches the input
+                if input_url.strip() != url.strip():
+                    i += 1
+                    continue  # Skip rows where the URL doesn't match the user input
 
-    # Step 2: Provide download button for the zip file
-    if chart_js_files:
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for filename, content in chart_js_files:
-                zf.writestr(filename, content)
+                # Collect headers
+                matching_headers.update(headers_row)
 
-        # Provide download button
-        st.download_button(
-            label="Download Chart.js Files as ZIP",
-            data=zip_buffer.getvalue(),
-            file_name=f"vpn_speed_tests_{uuid.uuid4().hex[:6]}.zip",
-            mime="application/zip"
-        )
+                # Collect overall score headers
+                matched_overall_columns = [header for header in headers_row if header and 'overall score' in header.lower()]
+                overall_score_headers.update(matched_overall_columns)
 
-# Run the function to process the consolidated data and generate the charts
-process_consolidated_data()
+                # Use a combination of URL and provider name to ensure uniqueness across datasets
+                unique_provider_key = f"{url}_{provider_name}"
+                if unique_provider_key not in processed_providers:
+                    processed_providers.add(unique_provider_key)
+                    if provider_name not in provider_names:
+                        provider_names.append(provider_name)  # Add provider name once
+
+                    # Initialize overall_scores_data for new columns
+                    for header in matched_overall_columns:
+                        if header not in overall_scores_data:
+                            overall_scores_data[header] = {}
+                    # Extract overall score data for the provider
+                    for col in matched_overall_columns:
+                        try:
+                            col_index = headers_row.index(col)
+                            score = provider_row[col_index]
+                            if score:
+                                score_value = float(score)  # Convert to float
+                            else:
+                                score_value = 0
+                        except (ValueError, IndexError):
+                            score_value = 0  # Handle errors by assigning a default value
+
+                        overall_scores_data[col][provider_name] = score_value
+
+                    # Store the article name associated with this provider
+                    speed_test_data_per_provider[provider_name] = {'article_name': article_name}
+
+                i += 1  # Move to next provider row
+            # End of current dataset
+            continue  # Go back to look for the next header row
+        else:
+            i += 1  # Move to next row
+
+    if not provider_names:
+        st.write("No data found for the given URL.")
+    else:
+        # We have collected the matching headers
+        headers_list = list(matching_headers)
+        # Remove 'URL' and 'VPN provider' from headers
+        headers_list = [header for header in headers_list if header not in ['URL', 'VPN provider']]
+        # Sort headers for better presentation
+        headers_list.sort()
+
+        # Now present the headers to the user for selection
+        st.write("Select the columns you want to include in the per-provider charts:")
+        selected_columns = st.multiselect("Available columns", headers_list)
+
+        # Allow the user to select which overall scores to export
+        overall_score_headers_list = list(overall_score_headers)
+        overall_score_headers_list.sort()
+        st.write("Select the overall scores you want to export to charts:")
+        selected_overall_scores = st.multiselect("Available overall scores", overall_score_headers_list, default=overall_score_headers_list)
+
+        # Now, if the user has selected columns or overall scores, process the data to generate the charts
+        if selected_columns or selected_overall_scores:
+            # Reset data structures
+            processed_providers = set()
+            provider_names = []
+
+            i = 0
+            while i < len(consolidated_data):
+                row = consolidated_data[i]
+                # Check if the row is a header row starting with 'URL'
+                if row and row[0] and row[0].strip().lower() == 'url':
+                    # Extract the article name from the previous row
+                    if i > 0:
+                        previous_row = consolidated_data[i - 1]
+                        if previous_row and previous_row[0].startswith('Sheet:'):
+                            raw_article_name = previous_row[0].replace('Sheet:', '').strip()
+                            article_name = make_title_natural(raw_article_name)
+                        else:
+                            article_name = 'VPN Analysis'
+                    else:
+                        article_name = 'VPN Analysis'
+                    st.write(f"Processing data for article: {article_name}")
+
+                    headers_row = row
+                    i += 1  # Move to the next row after the header
+
+                    # Process the data rows until the next header or end of data
+                    while i < len(consolidated_data):
+                        provider_row = consolidated_data[i]
+                        # Check if we've reached the next header row
+                        if provider_row and provider_row[0] and provider_row[0].strip().lower() == 'url':
+                            break  # Next header row found, break to process the new dataset
+
+                        # Skip empty rows or rows without URLs or VPN Provider
+                        if not provider_row or len(provider_row) < 2 or not provider_row[0] or not provider_row[1]:
+                            i += 1
+                            continue
+
+                        url = provider_row[0].strip()
+                        provider_name = provider_row[1].strip()
+
+                        # Only process the rows where the URL matches the input
+                        if input_url.strip() != url.strip():
+                            i += 1
+                            continue  # Skip rows where the URL doesn't match the user input
+
+                        # Use a combination of URL and provider name to ensure uniqueness across datasets
+                        unique_provider_key = f"{url}_{provider_name}"
+                        if unique_provider_key not in processed_providers:
+                            processed_providers.add(unique_provider_key)
+                            if provider_name not in provider_names:
+                                provider_names.append(provider_name)  # Add provider name once
+
+                            # Extract data for selected columns for the provider
+                            provider_selected_data = []
+                            selected_labels = []
+                            for col in selected_columns:
+                                if col in headers_row:
+                                    col_index = headers_row.index(col)
+                                    value = provider_row[col_index]
+                                    try:
+                                        value = float(value)
+                                    except (ValueError, TypeError):
+                                        value = 0
+                                    provider_selected_data.append(value)
+                                    selected_labels.append(col)
+                                else:
+                                    # Column not in this dataset's headers
+                                    provider_selected_data.append(0)
+                                    selected_labels.append(col)
+
+                            # Store data for provider
+                            if provider_name not in speed_test_data_per_provider:
+                                speed_test_data_per_provider[provider_name] = {'data': {}, 'article_name': article_name}
+                            speed_test_data_per_provider[provider_name]['data'] = (selected_labels, provider_selected_data)
+                            speed_test_data_per_provider[provider_name]['article_name'] = article_name
+
+                            # Extract overall score data for selected overall scores
+                            for col in selected_overall_scores:
+                                if col in headers_row:
+                                    col_index = headers_row.index(col)
+                                    score = provider_row[col_index]
+                                    try:
+                                        score_value = float(score)
+                                    except (ValueError, TypeError):
+                                        score_value = 0
+                                else:
+                                    score_value = 0
+
+                                if col not in overall_scores_data:
+                                    overall_scores_data[col] = {}
+                                overall_scores_data[col][provider_name] = score_value
+
+                        i += 1  # Move to next provider row
+                    # End of current dataset
+                    continue  # Go back to look for the next header row
+                else:
+                    i += 1  # Move to next row
+
+            # Generate per-provider charts
+            if selected_columns:
+                for provider_name, provider_info in speed_test_data_per_provider.items():
+                    labels, data_values = provider_info.get('data', ([], []))
+                    article_name = provider_info.get('article_name', 'VPN Analysis')
+
+                    # Assign color based on provider name
+                    vpn_colors = {
+                        'nordvpn': 'rgba(62, 95, 255, 0.8)',
+                        'surfshark': 'rgba(30, 191, 191, 0.8)',
+                        'expressvpn': 'rgba(218, 57, 64, 0.8)',
+                        'ipvanish': 'rgba(112, 187, 68, 0.8)',
+                        'cyberghost': 'rgba(255, 204, 0.8)',
+                        'purevpn': 'rgba(133, 102, 231, 0.8)',
+                        'protonvpn': 'rgba(109, 74, 255, 0.8)',
+                        'privatevpn': 'rgba(159, 97, 185, 0.8)',
+                        'pia': 'rgba(109, 200, 98, 0.8)',
+                        'hotspot shield': 'rgba(109, 192, 250, 0.8)',
+                        'strongvpn': 'rgba(238, 170, 29, 0.8)'
+                    }
+                    nice_colors = [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(153, 102, 255, 0.8)',
+                        'rgba(255, 159, 64, 0.8)'
+                    ]
+                    provider_color = vpn_colors.get(provider_name.lower(), 'rgba(75, 192, 192, 0.8)')
+
+                    # Generate unique IDs
+                    chart_id = f"{provider_name}_chart_{uuid.uuid4().hex[:6]}"
+
+                    # Prepare datasets
+                    datasets = [{
+                        'label': provider_name,
+                        'data': data_values,
+                        'backgroundColor': [provider_color] * len(labels),
+                        'borderColor': [provider_color] * len(labels),
+                        'borderWidth': 
