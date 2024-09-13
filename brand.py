@@ -6,6 +6,7 @@ import io
 import zipfile
 import json
 import logging
+import uuid  # For generating unique IDs
 
 # Step 1: Set up Google Sheets access
 credentials_info = st.secrets["gsheet_service_account"]
@@ -35,6 +36,7 @@ if input_url:
     processed_providers = set()
     speed_test_data_per_provider = {}
     matching_headers = set()
+    overall_score_headers = set()
     i = 0
     while i < len(consolidated_data):
         row = consolidated_data[i]
@@ -66,19 +68,20 @@ if input_url:
                 # Collect headers
                 matching_headers.update(headers_row)
 
+                # Collect overall score headers
+                matched_overall_columns = [header for header in headers_row if header and 'overall score' in header.lower()]
+                overall_score_headers.update(matched_overall_columns)
+
                 # Use a combination of URL and provider name to ensure uniqueness across datasets
                 unique_provider_key = f"{url}_{provider_name}"
                 if unique_provider_key not in processed_providers:
                     processed_providers.add(unique_provider_key)
                     provider_names.append(provider_name)  # Add provider name once
 
-                    # Collect all columns that contain 'overall score' in the header
-                    matched_overall_columns = [header for header in headers_row if header and 'overall score' in header.lower()]
-
                     # Initialize overall_scores_data for new columns
                     for header in matched_overall_columns:
                         if header not in overall_scores_data:
-                            overall_scores_data[header] = []
+                            overall_scores_data[header] = {}
 
                     # Extract overall score data for the provider
                     for col in matched_overall_columns:
@@ -86,11 +89,13 @@ if input_url:
                             col_index = headers_row.index(col)
                             score = provider_row[col_index]
                             if score:
-                                overall_scores_data[col].append(float(score))  # Convert to float
+                                score_value = float(score)  # Convert to float
                             else:
-                                overall_scores_data[col].append(0)
+                                score_value = 0
                         except (ValueError, IndexError):
-                            overall_scores_data[col].append(0)  # Handle errors by adding a default value
+                            score_value = 0  # Handle errors by assigning a default value
+
+                        overall_scores_data[col][provider_name] = score_value
 
                 i += 1  # Move to next provider row
             # End of current dataset
@@ -112,8 +117,14 @@ if input_url:
         st.write("Select the columns you want to include in the per-provider charts:")
         selected_columns = st.multiselect("Available columns", headers_list)
 
+        # Allow the user to select which overall scores to export
+        overall_score_headers_list = list(overall_score_headers)
+        overall_score_headers_list.sort()
+        st.write("Select the overall scores you want to export to charts:")
+        selected_overall_scores = st.multiselect("Available overall scores", overall_score_headers_list, default=overall_score_headers_list)
+
         # Now, if the user has selected columns, process the data to generate the per-provider charts
-        if selected_columns:
+        if selected_columns or selected_overall_scores:
             # Reset data structures
             speed_test_data_per_provider = {}
             processed_providers = set()
@@ -151,7 +162,8 @@ if input_url:
                         unique_provider_key = f"{url}_{provider_name}"
                         if unique_provider_key not in processed_providers:
                             processed_providers.add(unique_provider_key)
-                            provider_names.append(provider_name)  # Add provider name once
+                            if provider_name not in provider_names:
+                                provider_names.append(provider_name)  # Add provider name once
 
                             # Extract data for selected columns for the provider
                             provider_selected_data = []
@@ -174,101 +186,248 @@ if input_url:
                             # Store data for provider
                             speed_test_data_per_provider[provider_name] = (selected_labels, provider_selected_data)
 
+                            # Extract overall score data for selected overall scores
+                            for col in selected_overall_scores:
+                                if col in headers_row:
+                                    col_index = headers_row.index(col)
+                                    score = provider_row[col_index]
+                                    try:
+                                        score_value = float(score)
+                                    except (ValueError, TypeError):
+                                        score_value = 0
+                                else:
+                                    score_value = 0
+
+                                if col not in overall_scores_data:
+                                    overall_scores_data[col] = {}
+                                overall_scores_data[col][provider_name] = score_value
+
                         i += 1  # Move to next provider row
                     # End of current dataset
                     continue  # Go back to look for the next header row
                 else:
                     i += 1  # Move to next row
 
-            # Now generate charts using speed_test_data_per_provider
-            for provider_name, (labels, data_values) in speed_test_data_per_provider.items():
-                speed_test_chart_js = f"""
-                <div style="max-width: 500px; margin: 0 auto;">
-                    <canvas id="{provider_name}_SpeedChart" width="500" height="300"></canvas>
-                </div>
-                <script>
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        var ctx = document.getElementById('{provider_name}_SpeedChart').getContext('2d');
-                        var chart = new Chart(ctx, {{
-                            type: 'bar',
-                            data: {{
-                                labels: {json.dumps(labels)},
-                                datasets: [{{
-                                    label: '{provider_name} Data',
-                                    data: {json.dumps(data_values)},
-                                    backgroundColor: 'rgba(62, 95, 255, 0.8)',
-                                    borderColor: 'rgba(62, 95, 255, 0.8)',
-                                    borderWidth: 1
-                                }}]
-                            }},
-                            options: {{
-                                responsive: true,
-                                scales: {{
-                                    y: {{
-                                        beginAtZero: true,
-                                        title: {{
-                                            display: true,
-                                            text: 'Value'
-                                        }}
-                                    }}
-                                }},
-                                plugins: {{
-                                    title: {{
-                                        display: true,
-                                        text: '{provider_name} Data'
-                                    }}
-                                }}
-                            }}
-                        }});
-                    }});
-                </script>
-                """
-                chart_js_files.append((f"{provider_name}_data_chart.txt", speed_test_chart_js))
+            # Generate per-provider charts
+            if selected_columns:
+                for provider_name, (labels, data_values) in speed_test_data_per_provider.items():
+                    # Assign color based on provider name
+                    vpn_colors = {
+                        'nordvpn': 'rgba(62, 95, 255, 0.8)',
+                        'surfshark': 'rgba(30, 191, 191, 0.8)',
+                        'expressvpn': 'rgba(218, 57, 64, 0.8)',
+                        'ipvanish': 'rgba(112, 187, 68, 0.8)',
+                        'cyberghost': 'rgba(255, 204, 0.8)',
+                        'purevpn': 'rgba(133, 102, 231, 0.8)',
+                        'protonvpn': 'rgba(109, 74, 255, 0.8)',
+                        'privatevpn': 'rgba(159, 97, 185, 0.8)',
+                        'pia': 'rgba(109, 200, 98, 0.8)',
+                        'hotspot shield': 'rgba(109, 192, 250, 0.8)',
+                        'strongvpn': 'rgba(238, 170, 29, 0.8)'
+                    }
+                    nice_colors = [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(153, 102, 255, 0.8)',
+                        'rgba(255, 159, 64, 0.8)'
+                    ]
+                    provider_color = vpn_colors.get(provider_name.lower(), 'rgba(75, 192, 192, 0.8)')
 
-            # Generate overall score charts as before
-            for score_type, scores in overall_scores_data.items():
-                overall_score_chart_js = f"""
-                <div style="max-width: 805px; margin: 0 auto;">
-                    <canvas id="{score_type}_Chart" width="805" height="600"></canvas>
-                </div>
-                <script>
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        var ctx = document.getElementById('{score_type}_Chart').getContext('2d');
-                        var chart = new Chart(ctx, {{
-                            type: 'bar',
-                            data: {{
-                                labels: {json.dumps(provider_names)},
-                                datasets: [{{
-                                    label: 'VPN Providers {score_type}',
-                                    data: {json.dumps(scores)},
-                                    backgroundColor: {json.dumps(['rgba(62, 95, 255, 0.8)'] * len(provider_names))},
-                                    borderColor: {json.dumps(['rgba(31, 47, 127, 0.8)'] * len(provider_names))},
-                                    borderWidth: 1
-                                }}]
-                            }},
-                            options: {{
-                                responsive: true,
-                                scales: {{
-                                    y: {{
-                                        beginAtZero: true,
+                    # Generate unique IDs
+                    chart_id = f"{provider_name}_chart_{uuid.uuid4().hex[:6]}"
+
+                    # Prepare datasets
+                    datasets = [{
+                        'label': provider_name,
+                        'data': data_values,
+                        'backgroundColor': [provider_color] * len(labels),
+                        'borderColor': [provider_color] * len(labels),
+                        'borderWidth': 1
+                    }]
+
+                    # Prepare the chart JS
+                    speed_test_chart_js = f"""
+                    <div id="{chart_id}" style="max-width: 405px; margin: 0 auto;">
+                        <canvas class="jschartgraphic" id="vpnSpeedChart_{chart_id}" width="405" height="400"></canvas>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {{
+                            var ctx = document.getElementById('vpnSpeedChart_{chart_id}').getContext('2d');
+                            var vpnSpeedChart = new Chart(ctx, {{
+                                type: 'bar',
+                                data: {{
+                                    labels: {json.dumps(labels)},
+                                    datasets: {json.dumps(datasets)}
+                                }},
+                                options: {{
+                                    responsive: true,
+                                    plugins: {{
                                         title: {{
                                             display: true,
-                                            text: 'Score'
+                                            text: '{provider_name} Data',
+                                            font: {{
+                                                size: 18
+                                            }}
+                                        }},
+                                        legend: {{
+                                            display: true
+                                        }},
+                                        tooltip: {{
+                                            callbacks: {{
+                                                label: function(context) {{
+                                                    if (context.raw <= 0.05500000000000001) {{
+                                                        return 'No data available';
+                                                    }}
+                                                    return context.dataset.label + ': ' + context.raw + ' Mbps';
+                                                }}
+                                            }}
+                                        }}
+                                    }},
+                                    scales: {{
+                                        y: {{
+                                            beginAtZero: true,
+                                            title: {{
+                                                display: true,
+                                                text: 'Mbps'
+                                            }}
                                         }}
                                     }}
+                                }}
+                            }});
+                        }});
+                    </script>
+                    """
+
+                    # Generate schema data
+                    data_schema = {
+                        "@context": "http://schema.org",
+                        "@type": "Dataset",
+                        "name": f"{provider_name} Data",
+                        "description": f"Chart showing the selected data for {provider_name}.",
+                        "data": {
+                            provider_name: {
+                                label: f"{value} Mbps" for label, value in zip(labels, data_values)
+                            }
+                        }
+                    }
+
+                    speed_test_chart_js += f"""
+                    <script type="application/ld+json">
+                    {json.dumps(data_schema, indent=4)}
+                    </script>
+                    """
+
+                    chart_js_files.append((f"{provider_name}_data_chart.txt", speed_test_chart_js))
+
+            # Generate overall score charts
+            if selected_overall_scores:
+                for score_type in selected_overall_scores:
+                    # Prepare data
+                    datasets = []
+                    labels = [score_type]
+                    for provider_name in provider_names:
+                        score_value = overall_scores_data.get(score_type, {}).get(provider_name, 0)
+                        # Assign color based on provider name
+                        vpn_colors = {
+                            'nordvpn': 'rgba(62, 95, 255, 0.8)',
+                            'surfshark': 'rgba(30, 191, 191, 0.8)',
+                            'expressvpn': 'rgba(218, 57, 64, 0.8)',
+                            'ipvanish': 'rgba(112, 187, 68, 0.8)',
+                            'cyberghost': 'rgba(255, 204, 0.8)',
+                            'purevpn': 'rgba(133, 102, 231, 0.8)',
+                            'protonvpn': 'rgba(109, 74, 255, 0.8)',
+                            'privatevpn': 'rgba(159, 97, 185, 0.8)',
+                            'pia': 'rgba(109, 200, 98, 0.8)',
+                            'hotspot shield': 'rgba(109, 192, 250, 0.8)',
+                            'strongvpn': 'rgba(238, 170, 29, 0.8)'
+                        }
+                        provider_color = vpn_colors.get(provider_name.lower(), 'rgba(75, 192, 192, 0.8)')
+                        datasets.append({
+                            'label': provider_name,
+                            'data': [score_value],
+                            'backgroundColor': [provider_color],
+                            'borderColor': [provider_color],
+                            'borderWidth': 1
+                        })
+
+                    # Generate unique IDs
+                    chart_id = f"overall_{score_type.replace(' ', '_').lower()}_{uuid.uuid4().hex[:6]}"
+
+                    # Prepare the chart JS
+                    overall_score_chart_js = f"""
+                    <div id="{chart_id}" style="max-width: 805px; margin: 0 auto;">
+                        <canvas class="jschartgraphic" id="vpnSpeedChart_{chart_id}" width="805" height="600"></canvas>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {{
+                            var ctx = document.getElementById('vpnSpeedChart_{chart_id}').getContext('2d');
+                            var vpnSpeedChart = new Chart(ctx, {{
+                                type: 'bar',
+                                data: {{
+                                    labels: {json.dumps(labels)},
+                                    datasets: {json.dumps(datasets)}
                                 }},
-                                plugins: {{
-                                    title: {{
-                                        display: true,
-                                        text: 'VPN Providers {score_type}'
+                                options: {{
+                                    responsive: true,
+                                    plugins: {{
+                                        title: {{
+                                            display: true,
+                                            text: '{score_type}',
+                                            font: {{
+                                                size: 18
+                                            }}
+                                        }},
+                                        legend: {{
+                                            display: true
+                                        }},
+                                        tooltip: {{
+                                            callbacks: {{
+                                                label: function(context) {{
+                                                    if (context.raw <= 0.05500000000000001) {{
+                                                        return 'No data available';
+                                                    }}
+                                                    return context.dataset.label + ': ' + context.raw + ' Score out of 10';
+                                                }}
+                                            }}
+                                        }}
+                                    }},
+                                    scales: {{
+                                        y: {{
+                                            beginAtZero: true,
+                                            title: {{
+                                                display: true,
+                                                text: 'Score out of 10'
+                                            }}
+                                        }}
                                     }}
                                 }}
-                            }}
+                            }});
                         }});
-                    }});
-                </script>
-                """
-                chart_js_files.append((f"{score_type}_chart.txt", overall_score_chart_js))
+                    </script>
+                    """
+
+                    # Generate schema data
+                    data_schema = {
+                        "@context": "http://schema.org",
+                        "@type": "Dataset",
+                        "name": score_type,
+                        "description": f"Chart showing the {score_type} for each VPN provider tested.",
+                        "data": {
+                            provider_name: {
+                                labels[0]: f"{overall_scores_data.get(score_type, {}).get(provider_name, 0)} Score out of 10"
+                            } for provider_name in provider_names
+                        }
+                    }
+
+                    overall_score_chart_js += f"""
+                    <script type="application/ld+json">
+                    {json.dumps(data_schema, indent=4)}
+                    </script>
+                    """
+
+                    chart_js_files.append((f"{score_type}_chart.txt", overall_score_chart_js))
 
             # Provide download button for the zip file
             if chart_js_files:
@@ -285,7 +444,7 @@ if input_url:
                     mime="application/zip"
                 )
         else:
-            st.write("Please select at least one column to generate per-provider charts.")
+            st.write("Please select at least one column or overall score to generate charts.")
 
 else:
     st.write("Please enter a URL to search for.")
