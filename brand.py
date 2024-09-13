@@ -42,6 +42,17 @@ if input_url:
         row = consolidated_data[i]
         # Check if the row is a header row starting with 'URL'
         if row and row[0] and row[0].strip().lower() == 'url':
+            # Extract the article name from the previous row
+            if i > 0:
+                previous_row = consolidated_data[i - 1]
+                if previous_row and previous_row[0].startswith('Sheet:'):
+                    article_name = previous_row[0].replace('Sheet:', '').strip()
+                else:
+                    article_name = 'VPN Analysis'
+            else:
+                article_name = 'VPN Analysis'
+            st.write(f"Processing data for article: {article_name}")
+
             headers_row = row
             i += 1  # Move to the next row after the header
 
@@ -97,6 +108,9 @@ if input_url:
 
                         overall_scores_data[col][provider_name] = score_value
 
+                    # Store the article name associated with this provider
+                    speed_test_data_per_provider[provider_name] = {'article_name': article_name}
+
                 i += 1  # Move to next provider row
             # End of current dataset
             continue  # Go back to look for the next header row
@@ -123,10 +137,9 @@ if input_url:
         st.write("Select the overall scores you want to export to charts:")
         selected_overall_scores = st.multiselect("Available overall scores", overall_score_headers_list, default=overall_score_headers_list)
 
-        # Now, if the user has selected columns, process the data to generate the per-provider charts
+        # Now, if the user has selected columns or overall scores, process the data to generate the charts
         if selected_columns or selected_overall_scores:
             # Reset data structures
-            speed_test_data_per_provider = {}
             processed_providers = set()
             provider_names = []
 
@@ -135,6 +148,17 @@ if input_url:
                 row = consolidated_data[i]
                 # Check if the row is a header row starting with 'URL'
                 if row and row[0] and row[0].strip().lower() == 'url':
+                    # Extract the article name from the previous row
+                    if i > 0:
+                        previous_row = consolidated_data[i - 1]
+                        if previous_row and previous_row[0].startswith('Sheet:'):
+                            article_name = previous_row[0].replace('Sheet:', '').strip()
+                        else:
+                            article_name = 'VPN Analysis'
+                    else:
+                        article_name = 'VPN Analysis'
+                    st.write(f"Processing data for article: {article_name}")
+
                     headers_row = row
                     i += 1  # Move to the next row after the header
 
@@ -184,7 +208,9 @@ if input_url:
                                     selected_labels.append(col)
 
                             # Store data for provider
-                            speed_test_data_per_provider[provider_name] = (selected_labels, provider_selected_data)
+                            if provider_name not in speed_test_data_per_provider:
+                                speed_test_data_per_provider[provider_name] = {'data': {}, 'article_name': article_name}
+                            speed_test_data_per_provider[provider_name]['data'] = (selected_labels, provider_selected_data)
 
                             # Extract overall score data for selected overall scores
                             for col in selected_overall_scores:
@@ -210,7 +236,10 @@ if input_url:
 
             # Generate per-provider charts
             if selected_columns:
-                for provider_name, (labels, data_values) in speed_test_data_per_provider.items():
+                for provider_name, provider_info in speed_test_data_per_provider.items():
+                    labels, data_values = provider_info.get('data', ([], []))
+                    article_name = provider_info.get('article_name', 'VPN Analysis')
+
                     # Assign color based on provider name
                     vpn_colors = {
                         'nordvpn': 'rgba(62, 95, 255, 0.8)',
@@ -247,6 +276,9 @@ if input_url:
                         'borderWidth': 1
                     }]
 
+                    # Generate chart title
+                    chart_title = f"{provider_name} Speed Tests for {article_name}"
+
                     # Prepare the chart JS
                     speed_test_chart_js = f"""
                     <div id="{chart_id}" style="max-width: 405px; margin: 0 auto;">
@@ -266,7 +298,7 @@ if input_url:
                                     plugins: {{
                                         title: {{
                                             display: true,
-                                            text: '{provider_name} Data',
+                                            text: {json.dumps(chart_title)},
                                             font: {{
                                                 size: 18
                                             }}
@@ -304,8 +336,8 @@ if input_url:
                     data_schema = {
                         "@context": "http://schema.org",
                         "@type": "Dataset",
-                        "name": f"{provider_name} Data",
-                        "description": f"Chart showing the selected data for {provider_name}.",
+                        "name": chart_title,
+                        "description": f"This chart shows the speed test results for {provider_name} when used for {article_name}.",
                         "data": {
                             provider_name: {
                                 label: f"{value} Mbps" for label, value in zip(labels, data_values)
@@ -374,7 +406,7 @@ if input_url:
                                     plugins: {{
                                         title: {{
                                             display: true,
-                                            text: '{score_type}',
+                                            text: {json.dumps(score_type)},
                                             font: {{
                                                 size: 18
                                             }}
