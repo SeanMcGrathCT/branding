@@ -77,8 +77,11 @@ def process_consolidated_data():
             for header in selected_overall_scores:
                 if header not in overall_scores_data:
                     overall_scores_data[header] = []
-                score = row[headers_row.index(header)]
-                overall_scores_data[header].append(float(score) if score else 0)
+                try:
+                    score = float(row[headers_row.index(header)]) if row[headers_row.index(header)] else 0
+                except ValueError:
+                    score = 0  # Default to 0 if the score cannot be converted to float
+                overall_scores_data[header].append(score)
 
     # Generate Chart.js code for each overall score
     for score_type, scores in overall_scores_data.items():
