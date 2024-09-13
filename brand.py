@@ -42,16 +42,15 @@ def match_headers_with_scores(headers_row, target_keyword):
 st.write("Enter the URL to find the corresponding VPN data:")
 input_url = st.text_input("URL", "")
 
-def process_consolidated_data():
+def process_consolidated_data(input_url):
     global chart_js_files
-    input_url = st.text_input("Enter the URL to find the corresponding VPN data:")
 
     if not input_url:
         st.write("Please enter a URL to search for.")
         return  # Exit the function if no URL is entered
 
     provider_names = []  # List to hold unique provider names
-    overall_scores_data = {"streaming ability": [], "security & privacy": [], "overall score": []}
+    overall_scores_data = {}
     processed_providers = set()  # To avoid duplicates
     speed_test_data_per_provider = {}
 
@@ -66,7 +65,7 @@ def process_consolidated_data():
             # Process each provider row
             for provider_row in providers_data:
                 # Skip empty rows or rows without URLs or VPN Provider
-                if not provider_row or not provider_row[0].startswith("http") or not provider_row[1]:
+                if not provider_row or len(provider_row) < 2 or not provider_row[0].startswith("http") or not provider_row[1]:
                     continue
 
                 url = provider_row[0].strip()
@@ -80,11 +79,8 @@ def process_consolidated_data():
                     processed_providers.add(provider_name)
                     provider_names.append(provider_name)  # Add provider name once
 
-                    # Fuzzy match columns related to speed tests
-                    speed_test_columns = ["am", "noon", "pm"]
-                    matched_speed_columns = [match_headers_with_scores(headers_row, col) for col in speed_test_columns]
-                    matched_speed_columns = [col for col in matched_speed_columns if col]  # Filter out None
-
+                    # Collect all columns that contain 'speed test'
+                    matched_speed_columns = [header for header in headers_row if 'speed test' in header.lower()]
                     st.write(f"Matched Speed Test Columns: {matched_speed_columns}")
 
                     # Extract speed test data for the provider
@@ -96,25 +92,24 @@ def process_consolidated_data():
                         except (ValueError, IndexError):
                             provider_speed_data.append(0)  # If there's an error, default to 0
 
-                    speed_test_data_per_provider[provider_name] = provider_speed_data
+                    speed_test_data_per_provider[provider_name] = (matched_speed_columns, provider_speed_data)
 
-                    # Process overall score columns
-                    overall_score_columns = ["overall score", "streaming ability", "security & privacy"]
-                    matched_overall_columns = [match_headers_with_scores(headers_row, col) for col in overall_score_columns]
-                    matched_overall_columns = [col for col in matched_overall_columns if col]  # Filter out None
-
+                    # Collect all columns that contain 'overall score' in the header
+                    matched_overall_columns = [header for header in headers_row if 'overall score' in header.lower()]
                     st.write(f"Matched Overall Score Columns: {matched_overall_columns}")
 
+                    # Initialize overall_scores_data
+                    for header in matched_overall_columns:
+                        if header not in overall_scores_data:
+                            overall_scores_data[header] = []
+
                     # Extract overall score data for the provider
-                    for idx, col in enumerate(overall_score_columns):
-                        if idx < len(matched_overall_columns) and matched_overall_columns[idx]:
-                            try:
-                                score = provider_row[headers_row.index(matched_overall_columns[idx])]
-                                overall_scores_data[col].append(float(score))  # Convert to float
-                            except (ValueError, IndexError):
-                                overall_scores_data[col].append(0)  # Handle errors by adding a default value
-                        else:
-                            overall_scores_data[col].append(0)  # Ensure every provider has a score
+                    for col in matched_overall_columns:
+                        try:
+                            score = provider_row[headers_row.index(col)]
+                            overall_scores_data[col].append(float(score))  # Convert to float
+                        except (ValueError, IndexError):
+                            overall_scores_data[col].append(0)  # Handle errors by adding a default value
 
     # Generate a single Chart.js for each overall score category for all providers
     for score_type, scores in overall_scores_data.items():
