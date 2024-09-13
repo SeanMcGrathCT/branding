@@ -157,7 +157,13 @@ def process_consolidated_data():
     for provider_name, row in speed_test_data_per_provider.items():
         unique_id = str(uuid.uuid4().hex[:6])
         speed_columns = [header for header in headers_row if 'speed test' in header.lower()]
-        provider_speed_data = [float(row[headers_row.index(col)]) if row[headers_row.index(col)] else 0 for col in speed_columns]
+        provider_speed_data = []
+        for col in speed_columns:
+            try:
+                score = float(row[headers_row.index(col)]) if row[headers_row.index(col)] else 0
+            except ValueError:
+                score = 0  # Default to 0 if the score cannot be converted to float
+            provider_speed_data.append(score)
 
         chart_js = f"""
         <div id="{provider_name.lower().replace(' ', '_')}_speed_chart_{unique_id}" style="max-width: 405px; margin: 0 auto;">
