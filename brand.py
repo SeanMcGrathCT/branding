@@ -36,7 +36,6 @@ def make_title_natural(article_name):
         if words:
             first_word = words[0]
             # Simple way to convert to gerund by adding 'ing'
-            # In a real scenario, use nltk or spacy for proper conjugation
             if not first_word.endswith('ing'):
                 if first_word.endswith('e'):
                     first_word = first_word[:-1] + 'ing'
@@ -554,4 +553,37 @@ if input_url:
                     filename = sanitize_filename(f"{score_type}_chart.txt")
                     chart_js_files.append((filename, overall_score_chart_js))
 
-                    # Display t
+                    # Display the table for this overall score
+                    st.write(f"### {score_type} Table")
+                    df = pd.DataFrame(score_table_data)
+                    st.table(df)
+
+                    # Provide download button for individual table
+                    csv = df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label=f"Download {score_type} Table as CSV",
+                        data=csv,
+                        file_name=f"{sanitize_filename(score_type.lower())}_table.csv",
+                        mime='text/csv'
+                    )
+
+            # Provide download button for the zip file
+            if chart_js_files:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zf:
+                    for filename, content in chart_js_files:
+                        zf.writestr(filename, content.encode('utf-8'))
+
+                # Provide download button
+                st.download_button(
+                    label="Download Chart.js Files as ZIP",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"{input_url.split('/')[-1]}_charts.zip",
+                    mime="application/zip"
+                )
+
+        else:
+            st.write("Please select at least one column or overall score to generate charts.")
+
+else:
+    st.write("Please enter a URL to search for.")
