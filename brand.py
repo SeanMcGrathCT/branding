@@ -136,6 +136,9 @@ if input_url:
                         except (ValueError, IndexError):
                             score_value = 0  # Handle errors by assigning a default value
 
+                        # Round overall scores to 1 decimal place
+                        score_value = round(score_value, 1)
+
                         overall_scores_data[col].setdefault('article_name', article_name)
                         overall_scores_data[col][provider_name] = score_value
 
@@ -233,6 +236,8 @@ if input_url:
                                         value = float(value)
                                     except (ValueError, TypeError):
                                         value = 0
+                                    # Round provider-level scores to 2 decimal places
+                                    value = round(value, 2)
                                     provider_selected_data.append(value)
                                     selected_labels.append(col)
                                 else:
@@ -256,6 +261,9 @@ if input_url:
                                         score_value = 0
                                 else:
                                     score_value = 0
+
+                                # Round overall scores to 1 decimal place
+                                score_value = round(score_value, 1)
 
                                 if col not in overall_scores_data:
                                     overall_scores_data[col] = {}
@@ -383,7 +391,7 @@ if input_url:
                     filename = sanitize_filename(f"{provider_name}_data_chart.txt")
                     chart_js_files.append((filename, speed_test_chart_js))
 
-            # Generate overall score charts
+            # Generate overall score charts and display tables
             if selected_overall_scores:
                 for score_type in selected_overall_scores:
                     # Prepare data
@@ -391,6 +399,8 @@ if input_url:
                     labels = [score_type]
                     # Retrieve the article name from overall_scores_data
                     article_name = overall_scores_data.get(score_type, {}).get('article_name', 'VPN Analysis')
+                    score_table_data = []
+
                     for provider_name in provider_names:
                         score_value = overall_scores_data.get(score_type, {}).get(provider_name, 0)
                         # Assign color based on provider name
@@ -415,6 +425,9 @@ if input_url:
                             'borderColor': [provider_color],
                             'borderWidth': 1
                         })
+
+                        # Collect data for table
+                        score_table_data.append({'VPN Provider': provider_name, score_type: score_value})
 
                     # Generate unique IDs
                     chart_id = f"overall_{score_type.replace(' ', '_').lower()}_{uuid.uuid4().hex[:6]}"
@@ -499,6 +512,11 @@ if input_url:
 
                     filename = sanitize_filename(f"{score_type}_chart.txt")
                     chart_js_files.append((filename, overall_score_chart_js))
+
+                    # Display the table for this overall score
+                    st.write(f"### {score_type} Table")
+                    df = pd.DataFrame(score_table_data)
+                    st.table(df)
 
             # Provide download button for the zip file
             if chart_js_files:
