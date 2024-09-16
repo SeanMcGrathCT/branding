@@ -251,7 +251,7 @@ if input_url:
                             speed_test_data_per_provider[provider_name]['data'] = (selected_labels, provider_selected_data)
 
                             # Extract overall score data for selected overall scores
-                            for col in selected_overall_scores:
+                            for col in overall_score_headers_list:
                                 if col in headers_row:
                                     col_index = headers_row.index(col)
                                     score = provider_row[col_index]
@@ -392,8 +392,10 @@ if input_url:
                     chart_js_files.append((filename, speed_test_chart_js))
 
             # Generate overall score charts and display tables
-            if selected_overall_scores:
-                for score_type in selected_overall_scores:
+            master_table_data = []
+
+            if overall_score_headers_list:
+                for score_type in overall_score_headers_list:
                     # Prepare data
                     datasets = []
                     labels = [score_type]
@@ -518,6 +520,17 @@ if input_url:
                     df = pd.DataFrame(score_table_data)
                     st.table(df)
 
+                    # Add data to master table
+                    for entry in score_table_data:
+                        provider = entry['VPN Provider']
+                        score = entry[score_type]
+                        # Find if provider already exists in master_table_data
+                        provider_entry = next((item for item in master_table_data if item['VPN Provider'] == provider), None)
+                        if provider_entry:
+                            provider_entry[score_type] = score
+                        else:
+                            master_table_data.append({'VPN Provider': provider, score_type: score})
+
             # Provide download button for the zip file
             if chart_js_files:
                 zip_buffer = io.BytesIO()
@@ -532,6 +545,47 @@ if input_url:
                     file_name=f"{input_url.split('/')[-1]}_charts.zip",
                     mime="application/zip"
                 )
+
+            # Generate and display master table
+            if master_table_data:
+                st.write("## Master Overall Scores Table")
+                master_df = pd.DataFrame(master_table_data)
+                # Sort by 'Overall Score' if it exists
+                if 'Overall Score' in master_df.columns:
+                    master_df = master_df.sort_values(by='Overall Score', ascending=False)
+                else:
+                    # If 'Overall Score' is not present, sort by the first overall score column
+                    first_score_column = [col for col in master_df.columns if col != 'VPN Provider'][0]
+                    master_df = master_df.sort_values(by=first_score_column, ascending=False)
+                master_df.reset_index(drop=True, inplace=True)
+                st.table(master_df)
+
+                # Provide download button for master table
+                csv = master_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download Master Table as CSV",
+                    data=csv,
+                    file_name='master_overall_scores.csv',
+                    mime='text/csv'
+                )
+
+            # Provide download buttons for individual tables
+            for score_type in overall_score_headers_list:
+                # Prepare data
+                score_table_data = []
+                for provider_name in provider_names:
+                    score_value = overall_scores_data.get(score_type, {}).get(provider_name, 0)
+                    score_table_data.append({'VPN Provider': provider_name, score_type: score_value})
+
+                df = pd.DataFrame(score_table_data)
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label=f"Download {score_type} Table as CSV",
+                    data=csv,
+                    file_name=f"{sanitize_filename(score_type.lower())}_table.csv",
+                    mime='text/csv'
+                )
+
         else:
             st.write("Please select at least one column or overall score to generate charts.")
 
