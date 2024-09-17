@@ -22,6 +22,18 @@ sheet1 = client.open_by_url(sheet1_url)
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
 
+# Load the 'provider-ids' sheet and create a mapping
+provider_ids_sheet = sheet1.worksheet('provider-ids')
+provider_ids_data = provider_ids_sheet.get_all_values()
+
+# Create a mapping from provider names to IDs
+provider_id_mapping = {}
+for row in provider_ids_data[1:]:  # Skip header row
+    if len(row) >= 2:
+        provider_name = row[0].strip()
+        provider_id = row[1].strip()
+        provider_id_mapping[provider_name] = provider_id
+
 # Initialize a list to collect chart data
 chart_js_files = []
 
@@ -307,12 +319,37 @@ if input_url:
                 st.write("## Master Overall Scores Table")
                 st.table(master_df)
 
-                # Provide download button for master table
+                # Provide download button for master table with provider names
                 csv = master_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="Download Master Table as CSV",
                     data=csv,
                     file_name='master_overall_scores.csv',
+                    mime='text/csv'
+                )
+
+                # Create a copy of master_df and replace 'VPN Provider' with IDs
+                master_df_with_ids = master_df.copy()
+                mapped_ids = master_df_with_ids['VPN Provider'].map(provider_id_mapping)
+
+                # Identify providers not found in mapping
+                missing_providers = master_df_with_ids.loc[mapped_ids.isna(), 'VPN Provider'].unique()
+                if len(missing_providers) > 0:
+                    st.write("Warning: The following provider names were not found in the provider ID mapping:")
+                    st.write(missing_providers)
+
+                # Replace 'VPN Provider' column with mapped IDs
+                master_df_with_ids['VPN Provider'] = mapped_ids
+
+                # Optionally, fill NaNs with 'Unknown' or keep the names
+                master_df_with_ids['VPN Provider'].fillna('Unknown', inplace=True)
+
+                # Provide download button for master table with IDs
+                csv_with_ids = master_df_with_ids.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download Master Table with IDs as CSV",
+                    data=csv_with_ids,
+                    file_name='master_overall_scores_with_ids.csv',
                     mime='text/csv'
                 )
 
