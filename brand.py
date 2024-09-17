@@ -344,6 +344,20 @@ if input_url:
                 # Optionally, fill NaNs with 'Unknown' or keep the names
                 master_df_with_ids['VPN Provider'].fillna('Unknown', inplace=True)
 
+                # Rename 'VPN Provider' column to 'ID'
+                master_df_with_ids.rename(columns={'VPN Provider': 'ID'}, inplace=True)
+
+                # Remove 'Overall Score' column if it exists
+                if 'Overall Score' in master_df_with_ids.columns:
+                    master_df_with_ids.drop(columns=['Overall Score'], inplace=True)
+
+                # Strip ': Overall Score' from column headers
+                new_columns = {}
+                for col in master_df_with_ids.columns:
+                    new_col = col.replace(': Overall Score', '')
+                    new_columns[col] = new_col
+                master_df_with_ids.rename(columns=new_columns, inplace=True)
+
                 # Provide download button for master table with IDs
                 csv_with_ids = master_df_with_ids.to_csv(index=False).encode('utf-8')
                 st.download_button(
