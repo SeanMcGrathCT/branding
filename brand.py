@@ -309,6 +309,10 @@ if input_url:
                 # Create DataFrame
                 master_df = pd.DataFrame(master_table_data)
 
+                # Convert numeric columns to floats
+                numeric_columns = master_df.columns.drop('VPN Provider')
+                master_df[numeric_columns] = master_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
                 # Move 'Overall Score' column immediately after 'VPN Provider'
                 columns = list(master_df.columns)
                 if 'Overall Score' in columns:
@@ -326,7 +330,7 @@ if input_url:
 
                 # Round numerical columns to two decimal places for display
                 master_df_display = master_df.copy()
-                master_df_display = master_df_display.round(2)
+                master_df_display[numeric_columns] = master_df_display[numeric_columns].round(2)
 
                 # Display the master table first
                 st.write("## Master Overall Scores Table")
@@ -622,9 +626,14 @@ if input_url:
                     # Display the table for this overall score
                     st.write(f"### {score_type} Table")
                     df = pd.DataFrame(score_table_data)
+
+                    # Convert numeric columns to floats
+                    numeric_columns = df.columns.drop('VPN Provider')
+                    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
                     # Round numerical columns to two decimal places
                     df_display = df.copy()
-                    df_display = df_display.round(2)
+                    df_display[numeric_columns] = df_display[numeric_columns].round(2)
                     st.table(df_display)
 
                     # Provide download button for individual table
