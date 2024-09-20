@@ -293,12 +293,15 @@ if input_url:
                 else:
                     i += 1  # Move to next row
 
+            # Exclude 'Average' from master table overall scores
+            master_overall_score_headers_list = [header for header in overall_score_headers_list if 'average' not in header.lower()]
+
             # Generate and display master table
             master_table_data = []
-            if overall_score_headers_list:
+            if master_overall_score_headers_list:
                 for provider_name in provider_names:
                     provider_entry = {'VPN Provider': provider_name}
-                    for score_type in overall_score_headers_list:
+                    for score_type in master_overall_score_headers_list:
                         score_value = overall_scores_data.get(score_type, {}).get(provider_name, 0)
                         provider_entry[score_type] = score_value
                     master_table_data.append(provider_entry)
@@ -321,9 +324,13 @@ if input_url:
                     master_df = master_df.sort_values(by=first_score_column, ascending=False)
                 master_df.reset_index(drop=True, inplace=True)
 
+                # Round numerical columns to two decimal places for display
+                master_df_display = master_df.copy()
+                master_df_display = master_df_display.round(2)
+
                 # Display the master table first
                 st.write("## Master Overall Scores Table")
-                st.table(master_df)
+                st.table(master_df_display)
 
                 # Provide download button for master table with provider names
                 csv = master_df.to_csv(index=False).encode('utf-8')
@@ -372,6 +379,8 @@ if input_url:
                     file_name='master_overall_scores_with_ids.csv',
                     mime='text/csv'
                 )
+            else:
+                st.write("No overall scores (excluding 'Average') selected for the master table.")
 
             # Generate per-provider charts
             if selected_columns:
@@ -613,7 +622,10 @@ if input_url:
                     # Display the table for this overall score
                     st.write(f"### {score_type} Table")
                     df = pd.DataFrame(score_table_data)
-                    st.table(df)
+                    # Round numerical columns to two decimal places
+                    df_display = df.copy()
+                    df_display = df_display.round(2)
+                    st.table(df_display)
 
                     # Provide download button for individual table
                     csv = df.to_csv(index=False).encode('utf-8')
