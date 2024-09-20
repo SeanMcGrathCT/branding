@@ -330,11 +330,13 @@ if input_url:
 
                 # Round numerical columns to two decimal places for display
                 master_df_display = master_df.copy()
-                master_df_display[numeric_columns] = master_df_display[numeric_columns].round(2)
+                # Apply formatting using Styler
+                format_dict = {col: "{:.2f}" for col in numeric_columns}
+                master_df_display = master_df_display.style.format(format_dict)
 
-                # Display the master table first
+                # Display the master table first using st.dataframe()
                 st.write("## Master Overall Scores Table")
-                st.table(master_df_display)
+                st.dataframe(master_df_display)
 
                 # Provide download button for master table with provider names
                 csv = master_df.to_csv(index=False).encode('utf-8')
@@ -631,10 +633,10 @@ if input_url:
                     numeric_columns = df.columns.drop('VPN Provider')
                     df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
-                    # Round numerical columns to two decimal places
-                    df_display = df.copy()
-                    df_display[numeric_columns] = df_display[numeric_columns].round(2)
-                    st.table(df_display)
+                    # Apply formatting using Styler
+                    format_dict = {col: "{:.2f}" for col in numeric_columns}
+                    df_display = df.style.format(format_dict)
+                    st.dataframe(df_display)
 
                     # Provide download button for individual table
                     csv = df.to_csv(index=False).encode('utf-8')
