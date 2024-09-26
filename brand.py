@@ -328,10 +328,19 @@ if input_url:
                     master_df = master_df.sort_values(by=first_score_column, ascending=False)
                 master_df.reset_index(drop=True, inplace=True)
 
+                # Remove 'Overall Score' column from displayed table
+                if 'Overall Score' in master_df.columns:
+                    master_df_display = master_df.drop(columns=['Overall Score'])
+                else:
+                    master_df_display = master_df.copy()
+
                 # Round numerical columns to two decimal places for display
-                master_df_display = master_df.copy()
+                # Exclude 'Overall Score' from numeric_columns
+                numeric_columns_display = [col for col in master_df_display.columns if col != 'VPN Provider']
+                master_df_display[numeric_columns_display] = master_df_display[numeric_columns_display].apply(pd.to_numeric, errors='coerce')
+
                 # Apply formatting using Styler
-                format_dict = {col: "{:.2f}" for col in numeric_columns}
+                format_dict = {col: "{:.2f}" for col in numeric_columns_display}
                 master_df_display = master_df_display.style.format(format_dict)
 
                 # Display the master table first using st.dataframe()
@@ -632,6 +641,10 @@ if input_url:
                     # Convert numeric columns to floats
                     numeric_columns = df.columns.drop('VPN Provider')
                     df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
+                    # Sort df by the score_type column in descending order
+                    df = df.sort_values(by=score_type, ascending=False)
+                    df.reset_index(drop=True, inplace=True)
 
                     # Apply formatting using Styler
                     format_dict = {col: "{:.2f}" for col in numeric_columns}
