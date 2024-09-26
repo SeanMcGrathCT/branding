@@ -22,6 +22,44 @@ sheet1 = client.open_by_url(sheet1_url)
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
 
+# Load the Features Matrix data
+features_matrix_sheet = sheet1.worksheet('Features Matrix')
+features_matrix_data = features_matrix_sheet.get_all_values()
+
+# Convert the Features Matrix data to a DataFrame
+features_matrix_df = pd.DataFrame(features_matrix_data[1:], columns=features_matrix_data[0])
+
+# Step 2: Group the data by Category (Column B) and transpose the tables
+grouped_data = features_matrix_df.groupby('Category')
+
+# Prepare a dictionary to store each category's transposed table
+category_tables = {}
+
+# Iterate through each category and prepare the transposed tables
+for category, data in grouped_data:
+    # Drop the 'Category' column and transpose the rest
+    category_table = data.drop(columns='Category').set_index('Feature').T
+    # Store the transposed table with the category name
+    category_tables[category] = category_table.reset_index().rename(columns={'index': 'VPN Provider'})
+
+# Step 3: Display the preview tables for each category
+st.write("## Features Matrix Category Tables")
+
+for category, table in category_tables.items():
+    st.write(f"### {category} Category Table")
+    st.dataframe(table)
+
+    # Provide a download button for each category table
+    csv = table.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label=f"Download {category} Table as CSV",
+        data=csv,
+        file_name=f"{category}_category_table.csv",
+        mime='text/csv'
+    )
+
+# --- Existing logic for handling Consolidated Sheet and overall score calculations ---
+
 # Load the 'provider-ids' sheet and create a mapping
 provider_ids_sheet = sheet1.worksheet('provider-ids')
 provider_ids_data = provider_ids_sheet.get_all_values()
@@ -440,9 +478,6 @@ if input_url:
                     # Generate chart title
                     chart_title = f"{provider_name} Speed Tests for {article_name}"
 
-                    # Generate meta description
-                    meta_description = f"This chart shows the speed test results for {provider_name} when used for {article_name.lower()}."
-
                     # Prepare the chart JS
                     speed_test_chart_js = f"""
                     <div id="{chart_id}" style="max-width: 405px; margin: 0 auto;">
@@ -497,19 +532,19 @@ if input_url:
                     """
 
                     # Generate schema data with creator and license
-                    data_schema = {
+                    data_schema = {{
                         "@context": "http://schema.org",
                         "@type": "Dataset",
                         "name": chart_title,
-                        "description": meta_description,
+                        "description": f"This chart shows the speed test results for {provider_name} when used for {article_name.lower()}.",
                         "creator": "Comparitech Ltd",
                         "license": "https://creativecommons.org/licenses/by/4.0/",
-                        "data": {
-                            provider_name: {
+                        "data": {{
+                            provider_name: {{
                                 label: f"{value} Mbps" for label, value in zip(labels, data_values)
-                            }
-                        }
-                    }
+                            }}
+                        }}
+                    }}
 
                     speed_test_chart_js += f"""
                     <script type="application/ld+json">
@@ -563,9 +598,6 @@ if input_url:
 
                     # Generate chart title
                     chart_title = f"{score_type} for {article_name}"
-
-                    # Generate meta description
-                    meta_description = f"This chart shows the {score_type.lower()} for each VPN provider when used for {article_name.lower()}."
 
                     # Prepare the chart JS
                     overall_score_chart_js = f"""
@@ -625,7 +657,7 @@ if input_url:
                         "@context": "http://schema.org",
                         "@type": "Dataset",
                         "name": chart_title,
-                        "description": meta_description,
+                        "description": f"This chart shows the {score_type.lower()} for each VPN provider when used for {article_name.lower()}.",
                         "creator": "Comparitech Ltd",
                         "license": "https://creativecommons.org/licenses/by/4.0/",
                         "data": {
@@ -670,14 +702,14 @@ if input_url:
                         mime='text/csv'
                     )
 
-            # Provide download button for the zip file
+            # Provide download button for the zip file containing Chart.js files
             if chart_js_files:
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     for filename, content in chart_js_files:
                         zf.writestr(filename, content.encode('utf-8'))
 
-                # Provide download button
+                # Provide download button for the generated chart files
                 st.download_button(
                     label="Download Chart.js Files as ZIP",
                     data=zip_buffer.getvalue(),
