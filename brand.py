@@ -313,12 +313,6 @@ if input_url:
                 numeric_columns = master_df.columns.drop('VPN Provider')
                 master_df[numeric_columns] = master_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
-                # Move 'Overall Score' column immediately after 'VPN Provider'
-                columns = list(master_df.columns)
-                if 'Overall Score' in columns:
-                    columns.insert(1, columns.pop(columns.index('Overall Score')))
-                master_df = master_df[columns]
-
                 # Sort by 'Overall Score' if it exists
                 if 'Overall Score' in master_df.columns:
                     master_df = master_df.sort_values(by='Overall Score', ascending=False)
@@ -334,8 +328,20 @@ if input_url:
                 else:
                     master_df_display = master_df.copy()
 
+                # Reorder columns as specified
+                desired_columns = [
+                    'VPN Provider',
+                    'Ease of Use: Overall Score',
+                    'Security & Privacy: Overall Score',
+                    'Streaming Ability: Overall Score',
+                    'UK Speed: Overall Score',
+                    'Value for Money: Overall Score'
+                ]
+                # Keep only the columns that are present in master_df_display
+                columns_to_display = [col for col in desired_columns if col in master_df_display.columns]
+                master_df_display = master_df_display[columns_to_display]
+
                 # Round numerical columns to two decimal places for display
-                # Exclude 'Overall Score' from numeric_columns
                 numeric_columns_display = [col for col in master_df_display.columns if col != 'VPN Provider']
                 master_df_display[numeric_columns_display] = master_df_display[numeric_columns_display].apply(pd.to_numeric, errors='coerce')
 
@@ -671,7 +677,7 @@ if input_url:
                 st.download_button(
                     label="Download Chart.js Files as ZIP",
                     data=zip_buffer.getvalue(),
-                    file_name=f"{input_url.split('/')[-1]}_charts.zip",
+                    file_name=f"{sanitize_filename(input_url.split('/')[-1])}_charts.zip",
                     mime="application/zip"
                 )
 
