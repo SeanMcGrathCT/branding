@@ -478,6 +478,9 @@ if input_url:
                     # Generate chart title
                     chart_title = f"{provider_name} Speed Tests for {article_name}"
 
+                    # Generate meta description
+                    meta_description = f"This chart shows the speed test results for {provider_name} when used for {article_name.lower()}."
+
                     # Prepare the chart JS
                     speed_test_chart_js = f"""
                     <div id="{chart_id}" style="max-width: 405px; margin: 0 auto;">
@@ -532,19 +535,19 @@ if input_url:
                     """
 
                     # Generate schema data with creator and license
-                    data_schema = {{
+                    data_schema = {
                         "@context": "http://schema.org",
                         "@type": "Dataset",
                         "name": chart_title,
-                        "description": f"This chart shows the speed test results for {provider_name} when used for {article_name.lower()}.",
+                        "description": meta_description,
                         "creator": "Comparitech Ltd",
                         "license": "https://creativecommons.org/licenses/by/4.0/",
-                        "data": {{
-                            provider_name: {{
+                        "data": {
+                            provider_name: {
                                 label: f"{value} Mbps" for label, value in zip(labels, data_values)
-                            }}
-                        }}
-                    }}
+                            }
+                        }
+                    }
 
                     speed_test_chart_js += f"""
                     <script type="application/ld+json">
@@ -598,6 +601,9 @@ if input_url:
 
                     # Generate chart title
                     chart_title = f"{score_type} for {article_name}"
+
+                    # Generate meta description
+                    meta_description = f"This chart shows the {score_type.lower()} for each VPN provider when used for {article_name.lower()}."
 
                     # Prepare the chart JS
                     overall_score_chart_js = f"""
@@ -657,7 +663,7 @@ if input_url:
                         "@context": "http://schema.org",
                         "@type": "Dataset",
                         "name": chart_title,
-                        "description": f"This chart shows the {score_type.lower()} for each VPN provider when used for {article_name.lower()}.",
+                        "description": meta_description,
                         "creator": "Comparitech Ltd",
                         "license": "https://creativecommons.org/licenses/by/4.0/",
                         "data": {
