@@ -468,7 +468,7 @@ if input_url:
                                             }}
                                         }},
                                         legend: {{
-                                            display: true
+                                            display: false
                                         }},
                                         tooltip: {{
                                             callbacks: {{
@@ -496,12 +496,14 @@ if input_url:
                     </script>
                     """
 
-                    # Generate schema data
+                    # Generate schema data with creator and license
                     data_schema = {
                         "@context": "http://schema.org",
                         "@type": "Dataset",
                         "name": chart_title,
                         "description": meta_description,
+                        "creator": "Comparitech Ltd",
+                        "license": "Creative Commons 4",
                         "data": {
                             provider_name: {
                                 label: f"{value} Mbps" for label, value in zip(labels, data_values)
@@ -618,12 +620,14 @@ if input_url:
                     </script>
                     """
 
-                    # Generate schema data
+                    # Generate schema data with creator and license
                     data_schema = {
                         "@context": "http://schema.org",
                         "@type": "Dataset",
                         "name": chart_title,
                         "description": meta_description,
+                        "creator": "Comparitech Ltd",
+                        "license": "https://creativecommons.org/licenses/by/4.0/",
                         "data": {
                             provider_name: {
                                 labels[0]: f"{overall_scores_data.get(score_type, {}).get(provider_name, 0)} Score out of 10"
