@@ -22,59 +22,6 @@ sheet1 = client.open_by_url(sheet1_url)
 consolidated_sheet = sheet1.worksheet('Consolidated')
 consolidated_data = consolidated_sheet.get_all_values()
 
-# Load the Features Matrix data
-features_matrix_sheet = sheet1.worksheet('Features Matrix')
-features_matrix_data = features_matrix_sheet.get_all_values()
-
-# Convert the Features Matrix data to a DataFrame
-features_matrix_df = pd.DataFrame(features_matrix_data[1:], columns=features_matrix_data[0])
-
-# Step 2: Group the data by Category (Column B) and transpose the tables
-grouped_data = features_matrix_df.groupby('Category')
-
-# Prepare a dictionary to store each category's transposed table
-category_tables = {}
-
-# Iterate through each category and prepare the transposed tables
-for category, data in grouped_data:
-    # Drop the 'Category' column and transpose the rest
-    category_table = data.drop(columns='Category').set_index('Feature').T
-    # Store the transposed table with the category name
-    category_tables[category] = category_table.reset_index().rename(columns={'index': 'VPN Provider'})
-
-# Step 3: Display the preview tables for each category
-st.write("## Features Matrix Category Tables")
-
-for category, table in category_tables.items():
-    st.write(f"### {category} Category Table")
-    st.dataframe(table)
-
-    # Provide a download button for each category table
-    csv = table.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label=f"Download {category} Table as CSV",
-        data=csv,
-        file_name=f"{category}_category_table.csv",
-        mime='text/csv'
-    )
-
-# --- Existing logic for handling Consolidated Sheet and overall score calculations ---
-
-# Load the 'provider-ids' sheet and create a mapping
-provider_ids_sheet = sheet1.worksheet('provider-ids')
-provider_ids_data = provider_ids_sheet.get_all_values()
-
-# Create a mapping from provider names to IDs
-provider_id_mapping = {}
-for row in provider_ids_data[1:]:  # Skip header row
-    if len(row) >= 2:
-        provider_name = row[0].strip()
-        provider_id = row[1].strip()
-        provider_id_mapping[provider_name] = provider_id
-
-# Initialize a list to collect chart data
-chart_js_files = []
-
 # Function to make titles more natural
 def make_title_natural(article_name):
     article_name = article_name.strip()
@@ -330,6 +277,21 @@ if input_url:
                     continue  # Go back to look for the next header row
                 else:
                     i += 1  # Move to next row
+
+            # Load the 'provider-ids' sheet and create a mapping
+            provider_ids_sheet = sheet1.worksheet('provider-ids')
+            provider_ids_data = provider_ids_sheet.get_all_values()
+
+            # Create a mapping from provider names to IDs
+            provider_id_mapping = {}
+            for row in provider_ids_data[1:]:  # Skip header row
+                if len(row) >= 2:
+                    provider_name = row[0].strip()
+                    provider_id = row[1].strip()
+                    provider_id_mapping[provider_name] = provider_id
+
+            # Initialize a list to collect chart data
+            chart_js_files = []
 
             # Exclude 'Average' from master table overall scores
             master_overall_score_headers_list = [header for header in overall_score_headers_list if 'average' not in header.lower()]
@@ -722,6 +684,63 @@ if input_url:
                     file_name=f"{sanitize_filename(input_url.split('/')[-1])}_charts.zip",
                     mime="application/zip"
                 )
+
+            else:
+                st.write("Please select at least one column or overall score to generate charts.")
+
+            # --- Now, process the Features Matrix for the selected providers ---
+            # Load the Features Matrix data
+            features_matrix_sheet = sheet1.worksheet('Features Matrix')
+            features_matrix_data = features_matrix_sheet.get_all_values()
+
+            # Convert the Features Matrix data to a DataFrame
+            features_matrix_df = pd.DataFrame(features_matrix_data[1:], columns=features_matrix_data[0])
+
+            # Get the list of VPN Provider columns by excluding 'Category' and 'Feature'
+            provider_columns = [col for col in features_matrix_df.columns if col not in ['Category', 'Feature']]
+
+            # Filter the provider columns to include only those in provider_names
+            filtered_provider_columns = [col for col in provider_columns if col in provider_names]
+
+            # If no matching providers, inform the user
+            if not filtered_provider_columns:
+                st.write("No matching providers found in the Features Matrix for the given URL.")
+            else:
+                # Create a copy of the DataFrame with only the relevant providers
+                filtered_features_matrix_df = features_matrix_df[['Category', 'Feature'] + filtered_provider_columns]
+
+                # Now, group by 'Category' and prepare the transposed tables
+                grouped_data = filtered_features_matrix_df.groupby('Category')
+
+                # Prepare a dictionary to store each category's transposed table
+                category_tables = {}
+
+                # Iterate through each category and prepare the transposed tables
+                for category, data in grouped_data:
+                    # Set 'Feature' as index and transpose
+                    category_table = data.set_index('Feature').T
+
+                    # Reset index to get 'VPN Provider' as a column
+                    category_table = category_table.reset_index().rename(columns={'index': 'VPN Provider'})
+
+                    # Store the transposed table with the category name
+                    category_tables[category] = category_table
+
+                # Step 3: Display the features tables for each category underneath the overall scores tables
+                st.write("## Features Matrix Category Tables")
+
+                for category, table in category_tables.items():
+                    st.write(f"### {category} Category Table")
+                    st.dataframe(table)
+
+                    # Provide a download button for each category table
+                    csv = table.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label=f"Download {category} Table as CSV",
+                        data=csv,
+                        file_name=f"{category}_category_table.csv",
+                        mime='text/csv'
+                    )
 
         else:
             st.write("Please select at least one column or overall score to generate charts.")
