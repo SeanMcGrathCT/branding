@@ -503,7 +503,7 @@ if input_url:
                         "name": chart_title,
                         "description": meta_description,
                         "creator": "Comparitech Ltd",
-                        "license": "Creative Commons 4",
+                        "license": "https://creativecommons.org/licenses/by/4.0/",
                         "data": {
                             provider_name: {
                                 label: f"{value} Mbps" for label, value in zip(labels, data_values)
