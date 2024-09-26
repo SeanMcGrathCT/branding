@@ -7,6 +7,7 @@ import zipfile
 import json
 import uuid  # For generating unique IDs
 import re
+import os
 
 # Step 1: Set up Google Sheets access
 credentials_info = st.secrets["gsheet_service_account"]
@@ -15,12 +16,6 @@ creds = Credentials.from_service_account_info(credentials_info, scopes=scope)
 
 # Authorize client
 client = gspread.authorize(creds)
-
-# Load the Google Sheet
-sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
-sheet1 = client.open_by_url(sheet1_url)
-consolidated_sheet = sheet1.worksheet('Consolidated')
-consolidated_data = consolidated_sheet.get_all_values()
 
 # Function to make titles more natural
 def make_title_natural(article_name):
@@ -50,11 +45,17 @@ def make_title_natural(article_name):
 def sanitize_filename(filename):
     return re.sub(r'[^A-Za-z0-9_\-\.]', '_', filename)
 
-# Step 2: Prompt the user for a URL
+# Prompt the user for a URL
 st.write("Enter the URL to find the corresponding VPN data:")
 input_url = st.text_input("URL", "")
 
 if input_url:
+    # Load the Google Sheet after URL is entered
+    sheet1_url = 'https://docs.google.com/spreadsheets/d/1ZhJhTJSzrdM2c7EoWioMkzWpONJNyalFmWQDSue577Q'
+    sheet1 = client.open_by_url(sheet1_url)
+    consolidated_sheet = sheet1.worksheet('Consolidated')
+    consolidated_data = consolidated_sheet.get_all_values()
+
     # Process the data to collect headers and provider names
     provider_names = []
     overall_scores_data = {}
@@ -178,6 +179,12 @@ if input_url:
             speed_test_data_per_provider = {}
             overall_scores_data = {}
 
+            # Initialize lists for charts and tables
+            features_matrix_tables = []  # List of (filepath, dataframe)
+            overall_tables = []  # List of (filepath, dataframe)
+            provider_level_charts = []  # List of (filepath, content)
+            overall_charts = []  # List of (filepath, content)
+
             i = 0
             while i < len(consolidated_data):
                 row = consolidated_data[i]
@@ -286,12 +293,9 @@ if input_url:
             provider_id_mapping = {}
             for row in provider_ids_data[1:]:  # Skip header row
                 if len(row) >= 2:
-                    provider_name = row[0].strip()
+                    provider_name_map = row[0].strip()
                     provider_id = row[1].strip()
-                    provider_id_mapping[provider_name] = provider_id
-
-            # Initialize a list to collect chart data
-            chart_js_files = []
+                    provider_id_mapping[provider_name_map] = provider_id
 
             # Exclude 'Average' from master table overall scores
             master_overall_score_headers_list = [header for header in overall_score_headers_list if 'average' not in header.lower()]
@@ -362,6 +366,9 @@ if input_url:
                     mime='text/csv'
                 )
 
+                # Add to overall_tables
+                overall_tables.append(('Overall Tables/master_overall_scores.csv', master_df))
+
                 # Create a copy of master_df and replace 'VPN Provider' with IDs
                 master_df_with_ids = master_df.copy()
                 mapped_ids = master_df_with_ids['VPN Provider'].map(provider_id_mapping)
@@ -400,6 +407,9 @@ if input_url:
                     file_name='master_overall_scores_with_ids.csv',
                     mime='text/csv'
                 )
+
+                # Add to overall_tables
+                overall_tables.append(('Overall Tables/master_overall_scores_with_ids.csv', master_df_with_ids))
             else:
                 st.write("No overall scores (excluding 'Average') selected for the master table.")
 
@@ -518,7 +528,8 @@ if input_url:
                     """
 
                     filename = sanitize_filename(f"{provider_name}_data_chart.txt")
-                    chart_js_files.append((filename, speed_test_chart_js))
+                    filepath = os.path.join('Provider Level Charts', filename)
+                    provider_level_charts.append((filepath, speed_test_chart_js))
 
             # Generate overall score charts and display tables
             if selected_overall_scores:
@@ -642,7 +653,8 @@ if input_url:
                     """
 
                     filename = sanitize_filename(f"{score_type}_chart.txt")
-                    chart_js_files.append((filename, overall_score_chart_js))
+                    filepath = os.path.join('Overall Charts', filename)
+                    overall_charts.append((filepath, overall_score_chart_js))
 
                     # Display the table for this overall score
                     st.write(f"### {score_type} Table")
@@ -670,20 +682,9 @@ if input_url:
                         mime='text/csv'
                     )
 
-            # Provide download button for the zip file containing Chart.js files
-            if chart_js_files:
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as zf:
-                    for filename, content in chart_js_files:
-                        zf.writestr(filename, content.encode('utf-8'))
-
-                # Provide download button for the generated chart files
-                st.download_button(
-                    label="Download Chart.js Files as ZIP",
-                    data=zip_buffer.getvalue(),
-                    file_name=f"{sanitize_filename(input_url.split('/')[-1])}_charts.zip",
-                    mime="application/zip"
-                )
+                    # Add to overall_tables
+                    filepath = os.path.join('Overall Tables', f"{sanitize_filename(score_type.lower())}_table.csv")
+                    overall_tables.append((filepath, df))
 
             else:
                 st.write("Please select at least one column or overall score to generate charts.")
@@ -741,6 +742,77 @@ if input_url:
                         file_name=f"{category}_category_table.csv",
                         mime='text/csv'
                     )
+
+                    # Add to features_matrix_tables
+                    filepath = os.path.join('Features Matrix Tables', f"{category}_category_table.csv")
+                    features_matrix_tables.append((filepath, table))
+
+            # --- Provide Download Options at the end ---
+
+            # Provide download button for the zip file containing Chart.js files
+            if provider_level_charts or overall_charts:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zf:
+                    # Add provider level charts
+                    for filepath, content in provider_level_charts:
+                        zf.writestr(filepath, content.encode('utf-8'))
+                    # Add overall charts
+                    for filepath, content in overall_charts:
+                        zf.writestr(filepath, content.encode('utf-8'))
+
+                # Provide download button for the generated chart files
+                st.download_button(
+                    label="Download Chart.js Files as ZIP",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"{sanitize_filename(input_url.split('/')[-1])}_charts.zip",
+                    mime="application/zip"
+                )
+
+            # Provide download button for the tables zip
+            if features_matrix_tables or overall_tables:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zf:
+                    # Add features matrix tables
+                    for filepath, df in features_matrix_tables:
+                        csv_content = df.to_csv(index=False).encode('utf-8')
+                        zf.writestr(filepath, csv_content)
+                    # Add overall tables
+                    for filepath, df in overall_tables:
+                        csv_content = df.to_csv(index=False).encode('utf-8')
+                        zf.writestr(filepath, csv_content)
+
+                # Provide download button
+                st.download_button(
+                    label="Download All Tables as ZIP",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"{sanitize_filename(input_url.split('/')[-1])}_tables.zip",
+                    mime="application/zip"
+                )
+
+            # Provide download button for everything (charts and tables)
+            if (provider_level_charts or overall_charts) and (features_matrix_tables or overall_tables):
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zf:
+                    # Add charts
+                    for filepath, content in provider_level_charts:
+                        zf.writestr(os.path.join('Charts', filepath), content.encode('utf-8'))
+                    for filepath, content in overall_charts:
+                        zf.writestr(os.path.join('Charts', filepath), content.encode('utf-8'))
+                    # Add tables
+                    for filepath, df in features_matrix_tables:
+                        csv_content = df.to_csv(index=False).encode('utf-8')
+                        zf.writestr(os.path.join('Tables', filepath), csv_content)
+                    for filepath, df in overall_tables:
+                        csv_content = df.to_csv(index=False).encode('utf-8')
+                        zf.writestr(os.path.join('Tables', filepath), csv_content)
+
+                # Provide download button for everything zip
+                st.download_button(
+                    label="Download Everything",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"{sanitize_filename(input_url.split('/')[-1])}_everything.zip",
+                    mime="application/zip"
+                )
 
         else:
             st.write("Please select at least one column or overall score to generate charts.")
