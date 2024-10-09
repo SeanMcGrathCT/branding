@@ -532,160 +532,193 @@ if input_url:
                     provider_level_charts.append((filepath, speed_test_chart_js))
 
             # Generate overall score charts and display tables
-            if selected_overall_scores:
-                for score_type in selected_overall_scores:
-                    # Prepare data
-                    datasets = []
-                    labels = [score_type]
-                    # Retrieve the article name from overall_scores_data
-                    article_name = overall_scores_data.get(score_type, {}).get('article_name', 'VPN Analysis')
-                    score_table_data = []
+# Generate overall score charts and display tables
+                if selected_overall_scores:
+                    for score_type in selected_overall_scores:
+                        # Prepare data
+                        datasets = []
+                        if score_type.lower() == 'average':
+                            # For the Average chart, include both the Average and the user-selected columns
+                            labels = selected_columns + [score_type]  # Include user-selected columns and Average
+                        else:
+                            labels = [score_type]
+                        
+                        # Retrieve the article name from overall_scores_data
+                        article_name = overall_scores_data.get(score_type, {}).get('article_name', 'VPN Analysis')
+                        score_table_data = []
 
-                    for provider_name in provider_names:
-                        score_value = overall_scores_data.get(score_type, {}).get(provider_name, 0)
-                        # Assign color based on provider name
-                        vpn_colors = {
-                            'nordvpn': 'rgba(62, 95, 255, 0.8)',
-                            'surfshark': 'rgba(30, 191, 191, 0.8)',
-                            'expressvpn': 'rgba(218, 57, 64, 0.8)',
-                            'ipvanish': 'rgba(112, 187, 68, 0.8)',
-                            'cyberghost': 'rgba(255, 204, 0.8)',
-                            'purevpn': 'rgba(133, 102, 231, 0.8)',
-                            'protonvpn': 'rgba(109, 74, 255, 0.8)',
-                            'privatevpn': 'rgba(159, 97, 185, 0.8)',
-                            'pia': 'rgba(109, 200, 98, 0.8)',
-                            'hotspot shield': 'rgba(109, 192, 250, 0.8)',
-                            'strongvpn': 'rgba(238, 170, 29, 0.8)'
-                        }
-                        provider_color = vpn_colors.get(provider_name.lower(), 'rgba(75, 192, 192, 0.8)')
-                        datasets.append({
-                            'label': provider_name,
-                            'data': [score_value],
-                            'backgroundColor': [provider_color],
-                            'borderColor': [provider_color],
-                            'borderWidth': 1
-                        })
+                        for provider_name in provider_names:
+                            if score_type.lower() == 'average':
+                                # Get the Average score
+                                average_score = overall_scores_data.get(score_type, {}).get(provider_name, 0)
+                                
+                                # Get the scores for selected columns
+                                selected_scores = []
+                                if provider_name in speed_test_data_per_provider:
+                                    labels_data, values_data = speed_test_data_per_provider[provider_name].get('data', ([], []))
+                                    for col in selected_columns:
+                                        if col in labels_data:
+                                            index = labels_data.index(col)
+                                            selected_scores.append(values_data[index])
+                                        else:
+                                            selected_scores.append(0)
+                                else:
+                                    selected_scores = [0] * len(selected_columns)
 
-                        # Collect data for table
-                        score_table_data.append({'VPN Provider': provider_name, score_type: score_value})
+                                # Combine selected scores with Average score
+                                all_scores = selected_scores + [average_score]
+                                
+                                # Prepare table data
+                                table_row = {'VPN Provider': provider_name}
+                                for i, col in enumerate(selected_columns):
+                                    table_row[col] = selected_scores[i]
+                                table_row[score_type] = average_score
+                                score_table_data.append(table_row)
+                            else:
+                                all_scores = [overall_scores_data.get(score_type, {}).get(provider_name, 0)]
+                                score_table_data.append({'VPN Provider': provider_name, score_type: all_scores[0]})
 
-                    # Generate unique IDs
-                    chart_id = f"overall_{score_type.replace(' ', '_').lower()}_{uuid.uuid4().hex[:6]}"
+                            # Assign color based on provider name
+                            vpn_colors = {
+                                'nordvpn': 'rgba(62, 95, 255, 0.8)',
+                                'surfshark': 'rgba(30, 191, 191, 0.8)',
+                                'expressvpn': 'rgba(218, 57, 64, 0.8)',
+                                'ipvanish': 'rgba(112, 187, 68, 0.8)',
+                                'cyberghost': 'rgba(255, 204, 0.8)',
+                                'purevpn': 'rgba(133, 102, 231, 0.8)',
+                                'protonvpn': 'rgba(109, 74, 255, 0.8)',
+                                'privatevpn': 'rgba(159, 97, 185, 0.8)',
+                                'pia': 'rgba(109, 200, 98, 0.8)',
+                                'hotspot shield': 'rgba(109, 192, 250, 0.8)',
+                                'strongvpn': 'rgba(238, 170, 29, 0.8)'
+                            }
+                            provider_color = vpn_colors.get(provider_name.lower(), 'rgba(75, 192, 192, 0.8)')
+                            datasets.append({
+                                'label': provider_name,
+                                'data': all_scores,
+                                'backgroundColor': provider_color,
+                                'borderColor': provider_color,
+                                'borderWidth': 1
+                            })
 
-                    # Generate chart title
-                    chart_title = f"{score_type} for {article_name}"
+                        # Generate unique IDs
+                        chart_id = f"overall_{score_type.replace(' ', '_').lower()}_{uuid.uuid4().hex[:6]}"
 
-                    # Generate meta description
-                    meta_description = f"This chart shows the {score_type.lower()} for each VPN provider when used for {article_name.lower()}."
+                        # Generate chart title
+                        chart_title = f"{score_type} for {article_name}"
 
-                    # Prepare the chart JS
-                    overall_score_chart_js = f"""
-                    <div id="{chart_id}" style="max-width: 805px; margin: 0 auto;">
-                        <canvas class="jschartgraphic" id="vpnSpeedChart_{chart_id}" width="805" height="600"></canvas>
-                    </div>
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {{
-                            var ctx = document.getElementById('vpnSpeedChart_{chart_id}').getContext('2d');
-                            var vpnSpeedChart = new Chart(ctx, {{
-                                type: 'bar',
-                                data: {{
-                                    labels: {json.dumps(labels)},
-                                    datasets: {json.dumps(datasets)}
-                                }},
-                                options: {{
-                                    responsive: true,
-                                    plugins: {{
-                                        title: {{
-                                            display: true,
-                                            text: {json.dumps(chart_title)},
-                                            font: {{
-                                                size: 18
+                        # Generate meta description
+                        meta_description = f"This chart shows the {score_type.lower()} for each VPN provider when used for {article_name.lower()}."
+
+                        # Prepare the chart JS
+                        overall_score_chart_js = f"""
+                        <div id="{chart_id}" style="max-width: 805px; margin: 0 auto;">
+                            <canvas class="jschartgraphic" id="vpnSpeedChart_{chart_id}" width="805" height="600"></canvas>
+                        </div>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {{
+                                var ctx = document.getElementById('vpnSpeedChart_{chart_id}').getContext('2d');
+                                var vpnSpeedChart = new Chart(ctx, {{
+                                    type: 'bar',
+                                    data: {{
+                                        labels: {json.dumps(labels)},
+                                        datasets: {json.dumps(datasets)}
+                                    }},
+                                    options: {{
+                                        responsive: true,
+                                        plugins: {{
+                                            title: {{
+                                                display: true,
+                                                text: {json.dumps(chart_title)},
+                                                font: {{
+                                                    size: 18
+                                                }}
+                                            }},
+                                            legend: {{
+                                                display: true
+                                            }},
+                                            tooltip: {{
+                                                callbacks: {{
+                                                    label: function(context) {{
+                                                        if (context.raw <= 0.05500000000000001) {{
+                                                            return 'No data available';
+                                                        }}
+                                                        return context.dataset.label + ': ' + context.raw + 
+                                                            ({json.dumps(score_type.lower())} === 'average' ? ' Mbps' : ' Score out of 10');
+                                                    }}
+                                                }}
                                             }}
                                         }},
-                                        legend: {{
-                                            display: true
-                                        }},
-                                        tooltip: {{
-                                            callbacks: {{
-                                                label: function(context) {{
-                                                    if (context.raw <= 0.05500000000000001) {{
-                                                        return 'No data available';
-                                                    }}
-                                                    return context.dataset.label + ': ' + context.raw + ' Score out of 10';
+                                        scales: {{
+                                            y: {{
+                                                beginAtZero: true,
+                                                title: {{
+                                                    display: true,
+                                                    text: {json.dumps(score_type.lower())} === 'average' ? 'Mbps' : 'Score out of 10'
                                                 }}
                                             }}
                                         }}
-                                    }},
-                                    scales: {{
-                                        y: {{
-                                            beginAtZero: true,
-                                            title: {{
-                                                display: true,
-                                                text: 'Score out of 10'
-                                            }}
-                                        }}
                                     }}
-                                }}
+                                }});
                             }});
-                        }});
-                    </script>
-                    """
+                        </script>
+                        """
 
-                    # Generate schema data with creator and license
-                    data_schema = {
-                        "@context": "http://schema.org",
-                        "@type": "Dataset",
-                        "name": chart_title,
-                        "description": meta_description,
-                        "creator": "Comparitech Ltd",
-                        "license": "https://creativecommons.org/licenses/by/4.0/",
-                        "data": {
-                            provider_name: {
-                                labels[0]: f"{overall_scores_data.get(score_type, {}).get(provider_name, 0)} Score out of 10"
-                            } for provider_name in provider_names
+                        # Generate schema data with creator and license
+                        data_schema = {
+                            "@context": "http://schema.org",
+                            "@type": "Dataset",
+                            "name": chart_title,
+                            "description": meta_description,
+                            "creator": "Comparitech Ltd",
+                            "license": "https://creativecommons.org/licenses/by/4.0/",
+                            "data": {
+                                provider_name: {
+                                    label: f"{score} {'Mbps' if score_type.lower() == 'average' else 'Score out of 10'}"
+                                    for label, score in zip(labels, datasets[-1]['data'])
+                                } for dataset in datasets for provider_name in [dataset['label']]
+                            }
                         }
-                    }
 
-                    overall_score_chart_js += f"""
-                    <script type="application/ld+json">
-                    {json.dumps(data_schema, indent=4)}
-                    </script>
-                    """
+                        overall_score_chart_js += f"""
+                        <script type="application/ld+json">
+                        {json.dumps(data_schema, indent=4)}
+                        </script>
+                        """
 
-                    filename = sanitize_filename(f"{score_type}_chart.txt")
-                    filepath = os.path.join('Overall Charts', filename)
-                    overall_charts.append((filepath, overall_score_chart_js))
+                        filename = sanitize_filename(f"{score_type}_chart.txt")
+                        filepath = os.path.join('Overall Charts', filename)
+                        overall_charts.append((filepath, overall_score_chart_js))
 
-                    # Display the table for this overall score
-                    st.write(f"### {score_type} Table")
-                    df = pd.DataFrame(score_table_data)
+                        # Display the table for this overall score
+                        st.write(f"### {score_type} Table")
+                        df = pd.DataFrame(score_table_data)
 
-                    # Convert numeric columns to floats
-                    numeric_columns = df.columns.drop('VPN Provider')
-                    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+                        # Convert numeric columns to floats
+                        numeric_columns = df.columns.drop('VPN Provider')
+                        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
-                    # Sort df by the score_type column in descending order
-                    df = df.sort_values(by=score_type, ascending=False)
-                    df.reset_index(drop=True, inplace=True)
+                        # Sort df by the score_type column in descending order
+                        df = df.sort_values(by=score_type, ascending=False)
+                        df.reset_index(drop=True, inplace=True)
 
-                    # Apply formatting using Styler
-                    format_dict = {col: "{:.2f}" for col in numeric_columns}
-                    df_display = df.style.format(format_dict)
-                    st.dataframe(df_display)
+                        # Apply formatting using Styler
+                        format_dict = {col: "{:.2f}" for col in numeric_columns}
+                        df_display = df.style.format(format_dict)
+                        st.dataframe(df_display)
 
-                    # Provide download button for individual table
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label=f"Download {score_type} Table as CSV",
-                        data=csv,
-                        file_name=f"{sanitize_filename(score_type.lower())}_table.csv",
-                        mime='text/csv'
-                    )
+                        # Provide download button for individual table
+                        csv = df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label=f"Download {score_type} Table as CSV",
+                            data=csv,
+                            file_name=f"{sanitize_filename(score_type.lower())}_table.csv",
+                            mime='text/csv'
+                        )
 
-                    # Add to overall_tables
-                    filepath = os.path.join('Overall Tables', f"{sanitize_filename(score_type.lower())}_table.csv")
-                    overall_tables.append((filepath, df))
-
+                        # Add to overall_tables
+                        filepath = os.path.join('Overall Tables', f"{sanitize_filename(score_type.lower())}_table.csv")
+                        overall_tables.append((filepath, df))
             else:
                 st.write("Please select at least one column or overall score to generate charts.")
 
