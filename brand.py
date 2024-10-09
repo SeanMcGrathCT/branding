@@ -532,7 +532,6 @@ if input_url:
                     provider_level_charts.append((filepath, speed_test_chart_js))
 
             # Generate overall score charts and display tables
-            # Generate overall score charts and display tables
             if selected_overall_scores:
                 for score_type in selected_overall_scores:
                     # Prepare data
@@ -646,6 +645,46 @@ if input_url:
                             } for provider_name in provider_names
                         }
                     }
+
+                    overall_score_chart_js += f"""
+                    <script type="application/ld+json">
+                    {json.dumps(data_schema, indent=4)}
+                    </script>
+                    """
+
+                    filename = sanitize_filename(f"{score_type}_chart.txt")
+                    filepath = os.path.join('Overall Charts', filename)
+                    overall_charts.append((filepath, overall_score_chart_js))
+
+                    # Display the table for this overall score
+                    st.write(f"### {score_type} Table")
+                    df = pd.DataFrame(score_table_data)
+
+                    # Convert numeric columns to floats
+                    numeric_columns = df.columns.drop('VPN Provider')
+                    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
+                    # Sort df by the score_type column in descending order
+                    df = df.sort_values(by=score_type, ascending=False)
+                    df.reset_index(drop=True, inplace=True)
+
+                    # Apply formatting using Styler
+                    format_dict = {col: "{:.2f}" for col in numeric_columns}
+                    df_display = df.style.format(format_dict)
+                    st.dataframe(df_display)
+
+                    # Provide download button for individual table
+                    csv = df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label=f"Download {score_type} Table as CSV",
+                        data=csv,
+                        file_name=f"{sanitize_filename(score_type.lower())}_table.csv",
+                        mime='text/csv'
+                    )
+
+                    # Add to overall_tables
+                    filepath = os.path.join('Overall Tables', f"{sanitize_filename(score_type.lower())}_table.csv")
+                    overall_tables.append((filepath, df))
 
             else:
                 st.write("Please select at least one column or overall score to generate charts.")
