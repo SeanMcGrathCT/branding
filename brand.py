@@ -8,6 +8,7 @@ import json
 import uuid  # For generating unique IDs
 import re
 import os
+import math
 
 # Step 1: Set up Google Sheets access
 credentials_info = st.secrets["gsheet_service_account"]
@@ -246,7 +247,7 @@ if input_url:
                                     except (ValueError, TypeError):
                                         value = 0
                                     # Round provider-level scores to 2 decimal places
-                                    value = round(value, 2)
+                                    value = math.ceil(value * 100) / 100
                                     provider_selected_data.append(value)
                                     selected_labels.append(col)
                                 else:
@@ -315,7 +316,8 @@ if input_url:
 
                 # Convert numeric columns to floats
                 numeric_columns = master_df.columns.drop('VPN Provider')
-                master_df[numeric_columns] = master_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+                for col in numeric_columns:
+                    master_df[col] = master_df[col].apply(lambda x: math.ceil(float(x) * 100) / 100)
 
                 # Sort by 'Overall Score' if it exists
                 if 'Overall Score' in master_df.columns:
@@ -350,8 +352,8 @@ if input_url:
                 master_df_display[numeric_columns_display] = master_df_display[numeric_columns_display].apply(pd.to_numeric, errors='coerce')
 
                 # Apply formatting using Styler
-                format_dict = {col: "{:.2f}" for col in numeric_columns_display}
-                master_df_display = master_df_display.style.format(format_dict)
+                format_dict = {col: "{:.2f}" for col in numeric_columns}
+                master_df_display = master_df.style.format(format_dict)
 
                 # Display the master table first using st.dataframe()
                 st.write("## Master Overall Scores Table")
@@ -696,7 +698,8 @@ if input_url:
 
                         # Convert numeric columns to floats
                         numeric_columns = df.columns.drop('VPN Provider')
-                        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+                        for col in numeric_columns:
+                            df[col] = df[col].apply(lambda x: math.ceil(float(x) * 100) / 100)
 
                         # Sort df by the score_type column in descending order
                         df = df.sort_values(by=score_type, ascending=False)
